@@ -1,0 +1,17 @@
+# Archivos de entorno y claves secretas
+.env
+.env.local
+
+# Dependencias (nunca deben subirse)
+node_modules/
+vendor/
+
+# Archivos compilados o construidos
+dist/
+build/
+*.log
+
+# Archivos del sistema y del editor de código
+.DS_Store
+.vscode/
+.idea/
