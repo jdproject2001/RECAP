@@ -43,6 +43,6 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend corriendo en http://localhost:${PORT}`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
 });
