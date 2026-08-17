@@ -1,12 +1,26 @@
-import { Request, Response } from 'express';
-import pool, { query } from '../db';
+import { Response } from 'express';
+import pool from '../db';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
-export const createOrder = async (req: Request, res: Response): Promise<void> => {
+export const createOrder = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+
   const { nombre, email, whatsapp, items } = req.body;
 
   // Validación básica de entrada
   if (!nombre || !email || !whatsapp || !items || !Array.isArray(items) || items.length === 0) {
     res.status(400).json({ error: 'Datos incompletos o formato de carrito inválido.' });
+    return;
+  }
+
+  const firebaseUid = req.firebaseUser?.uid;
+
+  if (!firebaseUid) {
+    res.status(401).json({
+      error: 'Usuario no autenticado'
+    });
     return;
   }
 
@@ -16,21 +30,21 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
   try {
     await client.query('BEGIN');
 
-    // 1. Manejo del Usuario: Buscar o Crear (Frictionless Checkout)
-    let userResult = await client.query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    let usuarioId: string;
+    const userResult = await client.query(
+      'SELECT id FROM usuarios WHERE firebase_uid = $1',
+      [firebaseUid]
+    );
 
-    if (userResult.rows.length > 0) {
-      usuarioId = userResult.rows[0].id;
-    } else {
-      // Si no existe, lo creamos con un hash genérico provisional (o vacío ya que en Fase 1 no hay login obligatorio para comprar)
-      const newUser = await client.query(
-        `INSERT INTO usuarios (nombre, email, whatsapp, password_hash) 
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [nombre, email, whatsapp, 'checkout_express_no_pass']
-      );
-      usuarioId = newUser.rows[0].id;
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      res.status(404).json({
+        error: 'Usuario no encontrado en la base de datos'
+      });
+      return;
     }
+
+    const usuarioId = userResult.rows[0].id;
 
     // 2. Calcular el Monto Total consultando la Base de Datos
     let montoTotal = 0;

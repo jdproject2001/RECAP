@@ -4,6 +4,7 @@ import { ArrowLeft, Camera, Video, ShoppingCart, Sparkles, Plus } from "lucide-r
 import { useAuth } from "../context/authContext";
 import { useCart } from "../context/cartContext"; // <-- Asumiendo que esta es tu ruta
 import AuthModal from "../components/authModal";
+import { API_BASE } from '../config/api';
 
 interface Evento {
   id: string;
@@ -84,7 +85,7 @@ export default function PackagesPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`http://localhost:4000/api/v1/eventos/${eventId}/participantes/${participantId}`);
+        const res = await fetch(`${API_BASE}/eventos/${eventId}/participantes/${participantId}`);
         if (!res.ok) throw new Error("No se pudo cargar la información del participante.");
         
         const data = await res.json();

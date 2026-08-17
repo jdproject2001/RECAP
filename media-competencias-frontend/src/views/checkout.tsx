@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/cartContext';
+import { API_BASE } from '../config/api';
+import { auth } from '../firebase/firebase';
 
 export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCatalog }) => {
   const { cart, getCartTotal, clearCart } = useCart();
-  
+
   // Estados para el formulario de contacto
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -11,14 +13,21 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = 'http://localhost:4000/api/v1';
-
   const handleProcesarPago = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
 
     setLoading(true);
     setError(null);
+
+    const user = auth.currentUser;
+    if (!user) {
+      setError('Debes iniciar sesión para realizar una compra.');
+      setLoading(false);
+      return;
+    }
+
+    const token = await user.getIdToken();
 
     try {
       // PASO 1: Crear el Pedido en el Backend
@@ -34,7 +43,10 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
 
       const orderResponse = await fetch(`${API_BASE}/pedidos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(orderPayload)
       });
 
@@ -49,7 +61,10 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
       // PASO 2: Iniciar la sesión de pago (Mock Gateway o Placetopay)
       const paymentResponse = await fetch(`${API_BASE}/payments/initiate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ pedidoId })
       });
 
@@ -87,7 +102,7 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8">
       <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-        
+
         {/* Columna Izquierda: Resumen del Carrito */}
         <div className="bg-white p-6 rounded-xl shadow-xs border border-slate-100 flex flex-col justify-between">
           <div>
@@ -95,7 +110,7 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
               ← Volver al catálogo
             </button>
             <h2 className="text-xl font-black tracking-tight text-slate-900 mb-4">Resumen de tu Compra</h2>
-            
+
             <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto pr-2">
               {cart.map((item) => (
                 <div key={item.idUnique} className="py-3 flex justify-between items-center text-sm">
@@ -103,7 +118,7 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
                     <p className="font-bold text-slate-800">{item.paquete.nombre_paquete}</p>
                     <p className="text-xs text-indigo-600 font-medium">👤 Atleta: {item.participante.nombre_completo} (#{item.participante.dorsal_numero})</p>
                   </div>
-                  <p className="font-bold text-slate-900">${parseFloat(item.paquete.precio).toFixed(2)}</p>
+                  <p className="font-bold text-slate-900">${(item.paquete.precio).toFixed(2)}</p>
                 </div>
               ))}
             </div>
@@ -168,9 +183,8 @@ export const Checkout: React.FC<{ onBackToCatalog: () => void }> = ({ onBackToCa
             <button
               type="submit"
               disabled={loading}
-              className={`w-full text-white font-bold py-4 px-4 rounded-xl shadow-xs mt-6 transition-colors text-sm cursor-pointer ${
-                loading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
-              }`}
+              className={`w-full text-white font-bold py-4 px-4 rounded-xl shadow-xs mt-6 transition-colors text-sm cursor-pointer ${loading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
             >
               {loading ? 'Procesando con la pasarela...' : `Pagar $${getCartTotal().toFixed(2)} Seguro`}
             </button>

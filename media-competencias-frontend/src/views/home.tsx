@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../config/api';
 
 // 1. Definimos la interfaz del Evento
 interface Evento {
@@ -27,7 +28,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToCatalog }) => {
         const obtenerEventos = async () => {
             try {
                 setLoading(true);
-                const respuesta = await fetch('http://localhost:4000/api/v1/eventos');
+                const respuesta = await fetch(`${API_BASE}/eventos`);
 
                 if (!respuesta.ok) {
                     throw new Error('No se pudieron recuperar los eventos desde el servidor');

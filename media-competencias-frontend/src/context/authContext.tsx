@@ -2,17 +2,18 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { type User, onAuthStateChanged } from "firebase/auth";
 import { auth, loginWithGoogle, logout } from "../firebase/firebase";
+import { API_BASE } from '../config/api';
 
 // Tipo con la estructura actualizada de tu tabla 'usuarios'
 export interface DBUser {
-  id: string; // UUID de PostgreSQL
+  id: string;
   firebase_uid: string;
   email: string;
   nombre?: string;
   apellido?: string;
   celular?: string;
-  rol?: string;
-  creado_en?: string;
+  roles?: string[];
+  fecha_creacion?: string;
 }
 
 interface AuthContextType {
@@ -32,27 +33,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Función para sincronizar con tu Backend Node.js / Express
   const syncUserWithBackend = async (firebaseUser: User) => {
-    try {
-      const res = await fetch("http://localhost:4000/api/v1/auth/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-        }),
-      });
+  try {
+    // Obtener el token firmado por Firebase
+    const idToken = await firebaseUser.getIdToken();
 
-      if (!res.ok) {
-        throw new Error("Error en la respuesta del servidor de base de datos");
-      }
+    const res = await fetch(`${API_BASE}/auth/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+      }),
+    });
 
-      const data = await res.json();
-      setDbUser(data.usuario);
-    } catch (error) {
-      console.error("Error al sincronizar el usuario con la BD:", error);
+    if (!res.ok) {
+      throw new Error("Error en la respuesta del servidor de base de datos");
     }
-  };
+
+    const data = await res.json();
+    setDbUser(data.usuario);
+  } catch (error) {
+    console.error("Error al sincronizar el usuario con la BD:", error);
+    setDbUser(null);
+  }
+};
 
   useEffect(() => {
     // Escucha en tiempo real si el usuario inicia o cierra sesión

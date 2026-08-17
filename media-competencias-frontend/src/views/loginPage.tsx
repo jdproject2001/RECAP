@@ -1,7 +1,7 @@
 import { useState } from "react";
 //import { useAuth } from "../context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Mail, Lock, User as UserIcon, KeyRound } from "lucide-react";
+import { ArrowLeft, Mail, Lock} from "lucide-react";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 

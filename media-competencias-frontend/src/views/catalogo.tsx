@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCart, type Paquete, type Participante } from '../context/cartContext';
-
+import { API_BASE } from '../config/api';
 interface Evento {
   id: string;
   nombre: string;
@@ -14,7 +14,7 @@ interface Categoria {
 }
 
 export const Catalogo: React.FC = () => {
-  const { addToCart, cart } = useCart();
+  const { addToCart} = useCart();
 
   // Estados de los Datos de la API
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -27,8 +27,6 @@ export const Catalogo: React.FC = () => {
   const [selectedCategoria, setSelectedCategoria] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedParticipante, setSelectedParticipante] = useState<Participante | null>(null);
-
-  const API_BASE = 'http://localhost:4000/api/v1';
 
   // 1. Cargar Eventos al montar el componente
   useEffect(() => {
@@ -187,7 +185,7 @@ export const Catalogo: React.FC = () => {
                     <p className="text-sm text-slate-500 mt-1 leading-snug">{paj.descripcion}</p>
                   </div>
                   <div className="mt-6">
-                    <div className="text-2xl font-black text-slate-900 mb-3">${parseFloat(paj.precio).toFixed(2)}</div>
+                    <div className="text-2xl font-black text-slate-900 mb-3">${(paj.precio).toFixed(2)}</div>
                     <button
                       onClick={() => addToCart(paj, selectedParticipante)}
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors shadow-xs cursor-pointer"

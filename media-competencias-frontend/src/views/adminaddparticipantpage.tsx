@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, CheckCircle2, AlertCircle, Building2, Tag, Hash, User } from "lucide-react";
+import { API_BASE } from '../config/api';
 
 interface Categoria {
   id: string;
@@ -36,7 +37,7 @@ export default function AdminAddParticipantPage() {
       setLoadingCats(true);
       setErrorMsg(null);
 
-      const res = await fetch(`http://localhost:4000/api/v1/eventos/${eventId}/categorias`);
+      const res = await fetch(`${API_BASE}/eventos/${eventId}/categorias`);
       if (!res.ok) throw new Error("No se pudieron cargar las categorías del evento");
       
       const data: Categoria[] = await res.json();
@@ -69,7 +70,7 @@ export default function AdminAddParticipantPage() {
 
     try {
       setIsSubmitting(true);
-      const res = await fetch(`http://localhost:4000/api/v1/participantes`, {
+      const res = await fetch(`${API_BASE}/participantes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

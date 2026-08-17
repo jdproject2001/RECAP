@@ -1,18 +1,33 @@
 import { Router } from 'express';
 import express from 'express';
-import { 
-  initiatePayment, 
-  renderMockGateway, 
-  handleMockWebhook 
+import {
+  initiatePayment,
+  renderMockGateway,
+  handleMockWebhook
 } from '../controllers/paymentController';
+import { authenticateFirebase } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Necesitamos este middleware de Express para poder procesar formularios tradicionales (POST del simulador)
+// Procesar formularios tradicionales del simulador
 router.use(express.urlencoded({ extended: true }));
 
-router.post('/payments/initiate', initiatePayment);
-router.get('/payments/mock-gateway/:pedidoId/:sessionId', renderMockGateway);
-router.post('/payments/mock-webhook', handleMockWebhook);
+// Ruta protegida: requiere usuario autenticado con Firebase
+router.post(
+  '/payments/initiate',
+  authenticateFirebase,
+  initiatePayment
+);
+
+// Rutas del simulador
+router.get(
+  '/payments/mock-gateway/:pedidoId/:sessionId',
+  renderMockGateway
+);
+
+router.post(
+  '/payments/mock-webhook',
+  handleMockWebhook
+);
 
 export default router;

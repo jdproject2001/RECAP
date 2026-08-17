@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Search, Users, MapPin, Calendar, ChevronRight, ChevronDown, Building2 } from "lucide-react";
+import { API_BASE } from '../config/api';
 
 // Interfaces actualizadas al esquema relacional de la BD
 interface Evento {
@@ -58,7 +59,7 @@ export default function EventPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`http://localhost:4000/api/v1/eventos/${eventId}`);
+        const res = await fetch(`${API_BASE}/eventos/${eventId}`);
         if (!res.ok) throw new Error(`Error ${res.status}: No se pudo cargar el evento`);
 
         const data = await res.json();

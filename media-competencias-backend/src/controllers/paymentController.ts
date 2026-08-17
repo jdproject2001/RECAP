@@ -1,9 +1,13 @@
 import { Request, Response } from 'express';
 import pool, { query } from '../db';
-import { generateAuth } from '../config/placetopay';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 // 1. Iniciar Sesión de Pago (Request Session)
-export const initiatePayment = async (req: Request, res: Response): Promise<void> => {
+export const initiatePayment = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+
   const { pedidoId } = req.body;
 
   if (!pedidoId) {
@@ -11,11 +15,26 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
     return;
   }
 
+  const firebaseUid = req.firebaseUser?.uid;
+
+  if (!firebaseUid) {
+    res.status(401).json({
+      error: 'Usuario no autenticado.'
+    });
+    return;
+  }
+
   try {
     // Consultar el pedido en la BD
     const pedidoQuery = await query(
-      'SELECT id, monto_total, estado_pago FROM pedidos WHERE id = $1',
-      [pedidoId]
+      `
+    SELECT p.id, p.monto_total, p.estado_pago
+    FROM pedidos p
+    INNER JOIN usuarios u ON u.id = p.usuario_id
+    WHERE p.id = $1
+      AND u.firebase_uid = $2
+    `,
+      [pedidoId, firebaseUid]
     );
 
     if (pedidoQuery.rows.length === 0) {
@@ -36,7 +55,7 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
       // --- MODO SIMULADO ---
       const mockSessionId = `mock_session_${Date.now()}`;
       // Generamos una URL de nuestro propio backend que simulará ser el checkout de Placetopay
-      const mockProcessUrl = `http://localhost:4000/api/v1/payments/mock-gateway/${pedido.id}/${mockSessionId}`;
+      const mockProcessUrl = `${process.env.API_BASE_URL}/api/v1/payments/mock-gateway/${pedido.id}/${mockSessionId}`;
 
       // Guardamos la sesión simulada en el pedido
       await query(
@@ -50,11 +69,12 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
         sessionId: mockSessionId
       });
       return;
-    } else {
+    } 
       // --- MODO REAL (Para cuando tengas las credenciales) ---
       // Aquí irá la petición fetch/axios real hacia Placetopay usando generateAuth()
-      res.status(501).json({ error: 'Integración real de Placetopay no configurada aún.' });
-    }
+    res.status(501).json({
+      error: 'Integración real de Placetopay no configurada aún.'
+    });
 
   } catch (error) {
     res.status(500).json({
@@ -142,7 +162,7 @@ export const handleMockWebhook = async (req: Request, res: Response): Promise<vo
     if (nuevoEstado === 'aprobado') {
       // Buscamos los ítems del pedido
       const itemsQuery = await client.query('SELECT id FROM pedido_items WHERE pedido_id = $1', [pedidoId]);
-      
+
       // Creamos su fila de tracking técnico inicializado en pendiente
       for (const item of itemsQuery.rows) {
         await client.query(
