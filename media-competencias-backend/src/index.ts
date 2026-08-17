@@ -8,6 +8,7 @@ import eventosRoutes from './routes/eventRoutes';
 import orderRoutes from './routes/orderRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import participantRoutes from './routes/participantRoutes';
+import authRoutes from './routes/authRoutes';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/v1/auth', authRoutes);
 // 2. Registra la nueva ruta asegurándote de usar el prefijo /api/v1/eventos
 app.use('/api/v1/eventos', eventosRoutes); 
 
