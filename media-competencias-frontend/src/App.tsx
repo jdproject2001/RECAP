@@ -55,7 +55,7 @@ function AppRoutes() {
 
           <Route path="/mis-compras/:pedidoItemId/archivos" element={<MisArchivosPage />}/>
 
-          <Route path="/pago" element={<PaymentResult />} />
+          <Route path="/pago/resultado" element={<PaymentResult />}/>
           
           {/* 6. Redirección si la ruta no existe */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -39,7 +39,6 @@ export const Checkout: React.FC<{
     const [error, setError] = useState<string | null>(null);
     const [payphoneConfig, setPayphoneConfig] = useState<PayphoneConfig | null>(null);
     const [paymentBoxError, setPaymentBoxError] = useState<string | null>(null);
-    const [telefono, setTelefono] = useState('');
     // =====================================================
     // REFS DE CONTROL
     // =====================================================
@@ -60,12 +59,6 @@ export const Checkout: React.FC<{
     // =====================================================
     const prepararCheckout = async () => {
       if (cart.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      if (!telefono.trim()) {
-        setError('Ingresa tu número celular para continuar con el pago.');
         setLoading(false);
         return;
       }
@@ -94,8 +87,7 @@ export const Checkout: React.FC<{
               user.displayName || '',
             email:
               user.email || '',
-            whatsapp:
-              telefono.trim(),
+            whatsapp: '',
             items:
               cart.map(item => ({
                 paquete_id:
@@ -142,11 +134,6 @@ export const Checkout: React.FC<{
 
           pedidoCreadoRef.current =
             pedidoId;
-
-          console.log(
-            'PEDIDO CREADO:',
-            pedidoId
-          );
         }
 
         // =================================================
@@ -176,26 +163,7 @@ export const Checkout: React.FC<{
          * nos ayuda mucho a detectar respuestas
          * HTML inesperadas.
          */
-        const paymentText =
-          await paymentResponse.text();
-
-        console.log(
-          'PAYMENT STATUS:',
-          paymentResponse.status
-        );
-
-        console.log(
-          'PAYMENT CONTENT TYPE:',
-          paymentResponse.headers.get(
-            'content-type'
-          )
-        );
-
-        console.log(
-          'PAYMENT RAW RESPONSE:',
-          paymentText
-        );
-
+        const paymentText = await paymentResponse.text();
         let paymentData;
 
         try {
@@ -259,9 +227,7 @@ export const Checkout: React.FC<{
           token:
             paymentData.token,
           email:
-            paymentData.email,
-          phoneNumber:
-            telefono.trim()
+            paymentData.email
         });
       } catch (err) {
         console.error(
@@ -326,43 +292,46 @@ export const Checkout: React.FC<{
           try {
             container.innerHTML =
               '';
-
             new PayphoneBox({
               token:
                 payphoneConfig.token,
+
               clientTransactionId:
-                payphoneConfig
-                  .clientTransactionId,
+                payphoneConfig.clientTransactionId,
+
               amount:
                 payphoneConfig.amount,
+
               amountWithoutTax:
-                payphoneConfig
-                  .amountWithoutTax,
+                payphoneConfig.amountWithoutTax,
+
               amountWithTax:
-                payphoneConfig
-                  .amountWithTax,
+                payphoneConfig.amountWithTax,
+
               tax:
                 payphoneConfig.tax,
+
               service: 0,
               tip: 0,
+
               currency:
-                payphoneConfig.currency ||
-                'USD',
+                payphoneConfig.currency || 'USD',
+
               storeId:
                 payphoneConfig.storeId,
+
               reference:
                 payphoneConfig.reference,
+
               lang: 'es',
+
               defaultMethod:
                 'card',
-              timeZone: -5,
-              email:
-                payphoneConfig.email || auth.currentUser?.email || '',
-              phoneNumber:
-                payphoneConfig.phoneNumber || ''
-            }).render(
-              'pp-button'
-            );
+
+              timeZone:
+                -5
+
+            }).render('pp-button');
 
             payphoneRendered.current =
               true;
@@ -564,22 +533,6 @@ export const Checkout: React.FC<{
               {/* ========================================= */}
               {!payphoneConfig && !loading && (
                 <div>
-                  <div className="mb-5">
-                    <label className="block text-xs font-bold uppercase text-slate-500 mb-2">
-                      Número celular
-                    </label>
-                    <input
-                      type="tel"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                      placeholder="+593987654321"
-                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <p className="text-[11px] text-slate-400 mt-2">
-                      Payphone requiere el número celular del titular para procesar el pago.
-                    </p>
-                  </div>
-
                   {error && (
                     <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-xs font-bold mb-4">
                       ⚠️ {error}
@@ -589,11 +542,7 @@ export const Checkout: React.FC<{
                   <button
                     type="button"
                     onClick={prepararCheckout}
-                    disabled={!telefono.trim()}
-                    className={`w-full text-white font-bold py-4 px-4 rounded-xl transition-colors text-sm ${telefono.trim()
-                        ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer'
-                        : 'bg-slate-300 cursor-not-allowed'
-                      }`}
+                    className="w-full text-white font-bold py-4 px-4 rounded-xl transition-colors text-sm bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
                   >
                     Continuar al pago ${getCartTotal().toFixed(2)}
                   </button>

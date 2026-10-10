@@ -36,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   try {
     // Obtener el token firmado por Firebase
     const idToken = await firebaseUser.getIdToken();
- console.log("FIREBASE ID TOKEN:", idToken);
     const res = await fetch(`${API_BASE}/auth/sync`, {
       method: "POST",
       headers: {

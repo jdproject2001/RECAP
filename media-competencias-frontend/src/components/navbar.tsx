@@ -15,7 +15,7 @@ export default function Navbar() {
   return (
     <nav className="border-b border-slate-800/60 bg-[#0D111C]/80 backdrop-blur-md sticky top-0 z-50 transition-all">
       <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-        
+
         {/* LOGO RECAP DANCE */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
           <div className="flex flex-col leading-none">
@@ -36,12 +36,20 @@ export default function Navbar() {
 
         {/* ACCIONES, ENLACES Y CARRITO (Dentro del contenedor principal) */}
         <div className="flex items-center gap-6">
-          
+
           {/* ENLACES DE NAVEGACIÓN */}
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
             <Link to="/" className="text-white hover:text-red-400 transition-colors">Inicio</Link>
             <a href="/#eventos" className="hover:text-red-400 transition-colors">Eventos</a>
             <a href="/#quienes-somos" className="hover:text-red-400 transition-colors">Quiénes Somos</a>
+            {user && (
+              <Link
+                to="/mis-compras"
+                className="hover:text-red-400 transition-colors"
+              >
+                Mis compras
+              </Link>
+            )}
           </div>
 
           {/* BOTÓN DEL CARRITO */}
@@ -51,7 +59,7 @@ export default function Navbar() {
             title="Ver carrito"
           >
             <ShoppingCart size={20} />
-            
+
             {/* BADGE CON NÚMERO DE ARTÍCULOS */}
             {cartItemCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#0D111C] shadow-md animate-in zoom-in-50">

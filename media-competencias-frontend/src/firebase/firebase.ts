@@ -20,11 +20,6 @@ export const googleProvider = new GoogleAuthProvider();
 export const loginWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    console.log(
-    'Firebase login correcto:',
-    result.user.uid,
-    result.user.email
-  );
     return result.user;
   } catch (error: any) {
     console.error(

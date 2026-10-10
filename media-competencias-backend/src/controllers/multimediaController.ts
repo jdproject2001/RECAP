@@ -662,23 +662,33 @@ export const getMultimediaDownloadUrl = async (
   try {
     const result = await query(
       `
-      SELECT
-        m.id,
-        m.nombre_archivo,
-        m.tipo,
-        m.r2_original_key,
-        m.activo,
-        pe.estado_pago,
-        u.firebase_uid
-      FROM multimedia m
-      INNER JOIN pedido_item_multimedia pim ON pim.multimedia_id = m.id
-      INNER JOIN pedido_items pi ON pi.id = pim.pedido_item_id
-      INNER JOIN pedidos pe ON pe.id = pi.pedido_id
-      INNER JOIN usuarios u ON u.id = pe.usuario_id
-      WHERE m.id = $1
-        AND u.firebase_uid = $2
-      LIMIT 1
-      `,
+    SELECT
+      m.id,
+      m.nombre_archivo,
+      m.tipo,
+      m.r2_original_key,
+      m.activo,
+      pe.estado_pago,
+      pe.id AS pedido_id,
+      pi.id AS pedido_item_id,
+      u.firebase_uid
+    FROM multimedia m
+    INNER JOIN pedido_item_multimedia pim
+      ON pim.multimedia_id = m.id
+    INNER JOIN pedido_items pi
+      ON pi.id = pim.pedido_item_id
+    INNER JOIN pedidos pe
+      ON pe.id = pi.pedido_id
+    INNER JOIN usuarios u
+      ON u.id = pe.usuario_id
+    WHERE m.id = $1
+      AND u.firebase_uid = $2
+      AND LOWER(TRIM(pe.estado_pago)) IN (
+        'aprobado',
+        'approved'
+      )
+    LIMIT 1
+  `,
       [id, firebaseUid]
     );
 

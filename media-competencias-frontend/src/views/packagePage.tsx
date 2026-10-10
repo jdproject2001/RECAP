@@ -354,15 +354,6 @@ export default function PackagesPage() {
        * Todavía NO agregamos nada al carrito.
        * Primero debe escoger los archivos.
        */
-      console.log(
-        'ACTIVE PACKAGE ANTES DE NAVEGAR:',
-        activePackage
-      );
-
-      console.log(
-        'CANTIDAD FOTOS ACTIVE PACKAGE:',
-        activePackage.cantidad_fotos
-      );
       if (hayMaterial) {
 
         navigate(
