@@ -15,16 +15,19 @@ export interface Participante {
   dorsal_numero: string;
 }
 
+export type TipoCompra = 'RESERVA' | 'DIRECTA';
 export interface CartItem {
   idUnique: string; // Combinación única de participante_id + paquete_id
   paquete: Paquete;
   participante: Participante;
+  multimedia_ids: string[];
+  tipoCompra: TipoCompra;
 }
 
 // 2. Definimos qué funciones y datos expondrá nuestro carrito a toda la app
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (paquete: Paquete, participante: Participante) => void;
+  addToCart: (paquete: Paquete, participante: Participante, multimedia_ids: string[], tipoCompra: TipoCompra) => void;
   removeFromCart: (idUnique: string) => void;
   clearCart: () => void;
   getCartTotal: () => number;
@@ -38,13 +41,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cart, setCart] = useState<CartItem[]>([]);
 
   // Añadir al carrito evitando duplicados exactos
-  const addToCart = (paquete: Paquete, participante: Participante) => {
+  const addToCart = (paquete: Paquete, participante: Participante, multimedia_ids: string[], tipoCompra: TipoCompra) => {
     const idUnique = `${participante.id}-${paquete.id}`;
     
     setCart((prevCart) => {
       const exists = prevCart.some((item) => item.idUnique === idUnique);
       if (exists) return prevCart; // Si ya existe el mismo paquete para el mismo participante, no hace nada
-      return [...prevCart, { idUnique, paquete, participante }];
+      return [...prevCart, { idUnique, paquete, participante, multimedia_ids, tipoCompra }];
     });
   };
 

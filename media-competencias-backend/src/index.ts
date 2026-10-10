@@ -9,6 +9,8 @@ import orderRoutes from './routes/orderRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import participantRoutes from './routes/participantRoutes';
 import authRoutes from './routes/authRoutes';
+import r2TestRoutes from './routes/r2testroutes';
+import multimediaRoutes from './routes/multimediaRoutes';
 
 dotenv.config();
 
@@ -21,11 +23,19 @@ app.use(express.json());
 app.use('/api/v1/auth', authRoutes);
 // 2. Registra la nueva ruta asegurándote de usar el prefijo /api/v1/eventos
 app.use('/api/v1/eventos', eventosRoutes); 
-
+/*
 app.use('/api/v1', orderRoutes);
-app.use('/api/v1', paymentRoutes);
+app.use('/api/v1', paymentRoutes);*/
 
 app.use('/api/v1/participantes', participantRoutes);
+/*
+app.use('/api/v1', r2TestRoutes);*/
+
+app.use('/api/v1/multimedia', multimediaRoutes);
+
+app.use('/api/v1/pedidos', orderRoutes);
+
+app.use('/api/v1/payments', paymentRoutes);
 
 // Endpoint de prueba de salud
 app.get('/health', async (req, res) => {

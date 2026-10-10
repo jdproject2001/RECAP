@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   try {
     // Obtener el token firmado por Firebase
     const idToken = await firebaseUser.getIdToken();
-
+ console.log("FIREBASE ID TOKEN:", idToken);
     const res = await fetch(`${API_BASE}/auth/sync`, {
       method: "POST",
       headers: {
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Escucha en tiempo real si el usuario inicia o cierra sesión
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      
+     
       if (currentUser) {
         // Si hay un usuario autenticado en Firebase, lo sincronizamos con PostgreSQL
         await syncUserWithBackend(currentUser);

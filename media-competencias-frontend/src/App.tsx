@@ -9,6 +9,11 @@ import LoginPage from './views/loginPage';
 import Navbar from './components/navbar';
 import { AuthProvider } from './context/authContext';
 import CartPage from "./views/cartPage";
+import { PaymentResult } from './views/paymentResult';
+import MediaSelectionPage from './views/mediaSelectionPage';
+import AdminMediaPage from './views/adminMediaPage';
+import MisComprasPage from './views/misComprasPage';
+import MisArchivosPage from './views/misArchivosPage';
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -29,7 +34,13 @@ function AppRoutes() {
 
           {/* 4. RUTA ADMIN: Formulario para ingresar participantes */}
           <Route path="/evento/:eventId/admin/participantes" element={<AdminAddParticipantPage />} />
-          
+          {/* 4. RUTA ADMIN: Formulario para ingresar multimedia */}
+          <Route path="/admin/multimedia" element={<AdminMediaPage />}/>
+
+          <Route path="/eventos/:eventId/participantes/:participantId/seleccionar-material" element={<MediaSelectionPage />} />
+
+          <Route path="/mis-compras/:pedidoItemId/seleccionar-material" element={<MediaSelectionPage />} />
+
           {/* ⚠️ RUTA OBLIGATORIA: Previene que te devuelva al inicio */}
             <Route path="/carrito" element={<CartPage />} />
 
@@ -38,6 +49,13 @@ function AppRoutes() {
             path="/checkout" 
             element={<Checkout onBackToCatalog={() => navigate('/')} />} 
           />
+
+          {/*MIS COMPRAS */}
+          <Route path="/mis-compras" element={<MisComprasPage />}/>
+
+          <Route path="/mis-compras/:pedidoItemId/archivos" element={<MisArchivosPage />}/>
+
+          <Route path="/pago" element={<PaymentResult />} />
           
           {/* 6. Redirección si la ruta no existe */}
           <Route path="*" element={<Navigate to="/" replace />} />

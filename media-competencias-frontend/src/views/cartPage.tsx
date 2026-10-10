@@ -16,26 +16,27 @@ export default function CartPage() {
     };
 
     const total = cart.reduce((sum: number, item: any) => sum + getItemPrice(item), 0);
-
+    const reservas = cart.filter(item => item.tipoCompra === 'RESERVA').length;
+    const comprasDirectas = cart.filter(item => item.tipoCompra === 'DIRECTA').length;
     const handleCheckout = () => {
         if (cart.length === 0) return;
         if (!user) {
             navigate('/login');
-        } else {
-            alert("Procesando pago...");
+            return;
         }
+        navigate('/checkout');
     };
 
     // Función para manejar la eliminación enviando un ID en formato string
-  const handleRemoveItem = (item: any) => {
-    // Extraemos la propiedad idUnique que el context está filtrando
-    // Si no viniera a nivel raíz, intentamos construir la clave combinada por respaldo
-    const targetId = item.idUnique || item.id || `${item.paquete?.id}-${item.participante?.id}`;
+    const handleRemoveItem = (item: any) => {
+        // Extraemos la propiedad idUnique que el context está filtrando
+        // Si no viniera a nivel raíz, intentamos construir la clave combinada por respaldo
+        const targetId = item.idUnique || item.id || `${item.paquete?.id}-${item.participante?.id}`;
 
-    if (targetId) {
-      removeFromCart(targetId);
-    }
-  };
+        if (targetId) {
+            removeFromCart(targetId);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[#0D111C] text-white pt-24 pb-12">
@@ -102,6 +103,31 @@ export default function CartPage() {
                                                     Categoría: {participante.nombre_categoria}
                                                 </p>
                                             )}
+
+                                            {item.tipoCompra === 'RESERVA' ? (
+                                                <div className="mt-3">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                                        Reserva
+                                                    </span>
+
+                                                    <p className="text-xs text-slate-400 mt-2 max-w-md">
+                                                        El material todavía no está disponible. Cuando sea cargado,
+                                                        podrás seleccionarlo desde tus compras sin volver a pagar.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-3">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                                        Compra directa
+                                                    </span>
+
+                                                    <p className="text-xs text-slate-400 mt-2">
+                                                        {item.multimedia_ids?.length || 0} archivo
+                                                        {(item.multimedia_ids?.length || 0) === 1 ? '' : 's'} seleccionado
+                                                        {(item.multimedia_ids?.length || 0) === 1 ? '' : 's'}.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800/60">
@@ -147,6 +173,15 @@ export default function CartPage() {
                                 <span className="text-3xl font-black text-red-500" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
                                     ${total.toFixed(2)} <span className="text-xs text-slate-400">USD</span>
                                 </span>
+                            </div>
+
+                            <div className="text-xs text-slate-500 space-y-1 mb-4">
+                                {reservas > 0 && (
+                                    <p>{reservas} {reservas === 1 ? 'reserva' : 'reservas'}</p>
+                                )}
+                                {comprasDirectas > 0 && (
+                                    <p>{comprasDirectas}{' '}{comprasDirectas === 1 ? 'compra directa' : 'compras directas'}</p>
+                                )}
                             </div>
 
                             <button

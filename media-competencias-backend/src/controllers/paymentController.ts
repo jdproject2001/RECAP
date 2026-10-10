@@ -1,17 +1,24 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import crypto from 'crypto';
 import pool, { query } from '../db';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
-// 1. Iniciar Sesión de Pago (Request Session)
+const PAYPHONE_CONFIRM_URL = 'https://paymentbox.payphonetodoesposible.com/api/confirm';
+
+// ======================================================
+// 1. PREPARAR TRANSACCIÓN PARA CAJITA
+// ======================================================
+
 export const initiatePayment = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-
-  const { pedidoId } = req.body;
+  const { pedidoId } = req.body || {};
 
   if (!pedidoId) {
-    res.status(400).json({ error: 'Se requiere el pedidoId para iniciar el pago.' });
+    res.status(400).json({
+      error: 'Se requiere el pedidoId para iniciar el pago.'
+    });
     return;
   }
 
@@ -25,164 +32,459 @@ export const initiatePayment = async (
   }
 
   try {
-    // Consultar el pedido en la BD
+    // ====================================================
+    // 1. Buscar pedido
+    // ====================================================
+
     const pedidoQuery = await query(
       `
-    SELECT p.id, p.monto_total, p.estado_pago
-    FROM pedidos p
-    INNER JOIN usuarios u ON u.id = p.usuario_id
-    WHERE p.id = $1
-      AND u.firebase_uid = $2
-    `,
-      [pedidoId, firebaseUid]
+      SELECT
+        p.id,
+        p.monto_total,
+        p.estado_pago,
+        u.firebase_uid,
+        u.email,
+        u.nombre,
+        u.apellido,
+        u.celular
+      FROM pedidos p
+      INNER JOIN usuarios u
+        ON u.id = p.usuario_id
+      WHERE p.id = $1
+        AND u.firebase_uid = $2
+      LIMIT 1
+      `,
+      [
+        pedidoId,
+        firebaseUid
+      ]
     );
 
     if (pedidoQuery.rows.length === 0) {
-      res.status(404).json({ error: 'Pedido no encontrado.' });
+      res.status(404).json({
+        error: 'Pedido no encontrado.'
+      });
       return;
     }
 
     const pedido = pedidoQuery.rows[0];
 
-    if (pedido.estado_pago !== 'pendiente') {
-      res.status(400).json({ error: 'Este pedido ya fue procesado o cancelado.' });
-      return;
-    }
+    const estadoPago = pedido.estado_pago
+      ?.toString()
+      .trim()
+      .toLowerCase();
 
-    const paymentMode = process.env.PAYMENT_MODE || 'mock';
-
-    if (paymentMode === 'mock') {
-      // --- MODO SIMULADO ---
-      const mockSessionId = `mock_session_${Date.now()}`;
-      // Generamos una URL de nuestro propio backend que simulará ser el checkout de Placetopay
-      const mockProcessUrl = `${process.env.API_BASE_URL}/api/v1/payments/mock-gateway/${pedido.id}/${mockSessionId}`;
-
-      // Guardamos la sesión simulada en el pedido
-      await query(
-        'UPDATE pedidos SET placetopay_session_id = $1 WHERE id = $2',
-        [mockSessionId, pedido.id]
-      );
-
-      res.json({
-        message: 'Sesión de pago simulada creada',
-        processUrl: mockProcessUrl, // El frontend debe redirigir aquí
-        sessionId: mockSessionId
+    if (
+      estadoPago === 'aprobado' ||
+      estadoPago === 'approved'
+    ) {
+      res.status(400).json({
+        error: 'Este pedido ya fue pagado.'
       });
       return;
-    } 
-      // --- MODO REAL (Para cuando tengas las credenciales) ---
-      // Aquí irá la petición fetch/axios real hacia Placetopay usando generateAuth()
-    res.status(501).json({
-      error: 'Integración real de Placetopay no configurada aún.'
-    });
+    }
 
-  } catch (error) {
-    res.status(500).json({
-      error: 'Error al iniciar el pago',
-      details: error instanceof Error ? error.message : error
-    });
-  }
-};
+    // ====================================================
+    // 2. Validar variables Payphone
+    // ====================================================
 
-// 2. Pasarela Simulada (Vista HTML interactiva)
-// Esto simula la pantalla de Placetopay en el navegador para que puedas hacer click en "Aprobar" o "Rechazar"
-export const renderMockGateway = async (req: Request, res: Response): Promise<void> => {
-  const { pedidoId, sessionId } = req.params;
+    const token = process.env.PAYPHONE_TOKEN;
+    const storeId = process.env.PAYPHONE_STORE_ID;
 
-  try {
-    const pedidoQuery = await query('SELECT monto_total FROM pedidos WHERE id = $1', [pedidoId]);
-    if (pedidoQuery.rows.length === 0) {
-      res.status(404).send('Pedido no encontrado');
+    if (
+      !token ||
+      !storeId
+    ) {
+      res.status(500).json({
+        error: 'Configuración de Payphone incompleta.'
+      });
       return;
     }
 
-    const monto = pedidoQuery.rows[0].monto_total;
+    // ====================================================
+    // 3. Monto en centavos
+    // ====================================================
 
-    // Retornamos un HTML interactivo súper básico directamente desde Express
-    res.send(`
-      <html>
-        <head>
-          <title>Simulador de Placetopay</title>
-          <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f3f4f6; }
-            .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 350px; text-align: center; }
-            button { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-            .btn-success { background: #10b981; color: white; }
-            .btn-danger { background: #ef4444; color: white; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h2>Simulador Placetopay</h2>
-            <p><strong>Pedido ID:</strong> ${pedidoId}</p>
-            <p style="font-size: 24px; font-weight: bold; color: #1e3a8a;">$${monto} USD</p>
-            <p>Selecciona el resultado de la transacción:</p>
-            
-            <form action="/api/v1/payments/mock-webhook" method="POST">
-              <input type="hidden" name="pedidoId" value="${pedidoId}" />
-              <input type="hidden" name="sessionId" value="${sessionId}" />
-              <input type="hidden" name="status" value="APPROVED" />
-              <button type="submit" class="btn-success">Simular Pago Exitoso</button>
-            </form>
+    const monto = Number(pedido.monto_total);
 
-            <form action="/api/v1/payments/mock-webhook" method="POST">
-              <input type="hidden" name="pedidoId" value="${pedidoId}" />
-              <input type="hidden" name="sessionId" value="${sessionId}" />
-              <input type="hidden" name="status" value="REJECTED" />
-              <button type="submit" class="btn-danger">Simular Pago Fallido</button>
-            </form>
-          </div>
-        </body>
-      </html>
-    `);
+    if (
+      !Number.isFinite(monto) ||
+      monto <= 0
+    ) {
+      res.status(400).json({
+        error: 'El monto del pedido no es válido.'
+      });
+      return;
+    }
+
+    const amount = Math.round(monto * 100);
+
+    // ====================================================
+    // 4. Generar clientTransactionId
+    // ====================================================
+
+    const clientTransactionId = `R${Date.now()
+      .toString()
+      .slice(-10)}${crypto
+      .randomBytes(2)
+      .toString('hex')
+      .toUpperCase()}`;
+
+    // ====================================================
+    // 5. Guardarlo en el pedido
+    // ====================================================
+
+    await query(
+      `
+      UPDATE pedidos
+      SET
+        placetopay_session_id = $1,
+        estado_pago = 'pendiente'
+      WHERE id = $2
+      `,
+      [
+        clientTransactionId,
+        pedido.id
+      ]
+    );
+
+    // ====================================================
+    // 6. Datos necesarios para renderizar Cajita
+    // ====================================================
+
+    res.status(200).json({
+      message: 'Transacción preparada correctamente.',
+      pedidoId: pedido.id,
+      clientTransactionId,
+      amount,
+      amountWithoutTax: amount,
+      amountWithTax: 0,
+      tax: 0,
+      currency: 'USD',
+      storeId,
+      reference: `Pedido RECAP ${pedido.id}`,
+      email: pedido.email || '',
+      phoneNumber: pedido.celular || '',
+      /*
+       * La Cajita requiere el token
+       * en su configuración de frontend.
+       */
+      token
+    });
+
   } catch (error) {
-    res.status(500).send('Error interno en el simulador');
+    console.error(
+      'Error preparando pago Payphone:',
+      error
+    );
+
+    res.status(500).json({
+      error: 'Error al preparar el pago.',
+      details:
+        error instanceof Error
+          ? error.message
+          : error
+    });
   }
 };
 
-// 3. Webhook del Simulador
-// Recibe la confirmación del HTML anterior, procesa la transacción SQL y redirige al frontend
-export const handleMockWebhook = async (req: Request, res: Response): Promise<void> => {
-  const { pedidoId, sessionId, status } = req.body;
+// ======================================================
+// 2. CONFIRMAR PAGO PAYPHONE
+// ======================================================
+
+export const confirmPayment = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const firebaseUid = req.firebaseUser?.uid;
+  const {
+    id,
+    clientTransactionId
+  } = req.body;
+
+  if (!firebaseUid) {
+    res.status(401).json({
+      error: 'Usuario no autenticado.'
+    });
+    return;
+  }
+
+  if (
+    !id ||
+    !clientTransactionId
+  ) {
+    res.status(400).json({
+      error: 'Se requieren id y clientTransactionId.'
+    });
+    return;
+  }
+
+  const token = process.env.PAYPHONE_TOKEN;
+
+  if (!token) {
+    res.status(500).json({
+      error: 'PAYPHONE_TOKEN no está configurado.'
+    });
+    return;
+  }
 
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    // ====================================================
+    // 1. Buscar pedido por clientTransactionId
+    // ====================================================
 
-    const nuevoEstado = status === 'APPROVED' ? 'aprobado' : 'fallido';
-
-    // 1. Actualizamos el estado del pedido
-    await client.query(
-      'UPDATE pedidos SET estado_pago = $1 WHERE id = $2 AND placetopay_session_id = $3',
-      [nuevoEstado, pedidoId, sessionId]
+    const pedidoResult = await client.query(
+      `
+      SELECT
+        p.id,
+        p.monto_total,
+        p.estado_pago,
+        p.placetopay_session_id,
+        u.firebase_uid
+      FROM pedidos p
+      INNER JOIN usuarios u
+        ON u.id = p.usuario_id
+      WHERE p.placetopay_session_id = $1
+      LIMIT 1
+      `,
+      [
+        clientTransactionId
+      ]
     );
 
-    // 2. Si el pago fue aprobado, activamos el workflow para la Fase 2 (tracking técnico)
-    if (nuevoEstado === 'aprobado') {
-      // Buscamos los ítems del pedido
-      const itemsQuery = await client.query('SELECT id FROM pedido_items WHERE pedido_id = $1', [pedidoId]);
+    if (pedidoResult.rows.length === 0) {
+      res.status(404).json({
+        error: 'No se encontró un pedido asociado a esta transacción.'
+      });
+      return;
+    }
 
-      // Creamos su fila de tracking técnico inicializado en pendiente
-      for (const item of itemsQuery.rows) {
+    const pedido = pedidoResult.rows[0];
+
+    if (
+      pedido.firebase_uid !==
+      firebaseUid
+    ) {
+      res.status(403).json({
+        error: 'No tienes acceso a este pedido.'
+      });
+      return;
+    }
+
+    // ====================================================
+    // 2. Confirmar con Payphone
+    // ====================================================
+
+    const confirmBody = {
+      id: Number(id),
+      clientTxId: clientTransactionId
+    };
+
+    const payphoneResponse = await fetch(
+      PAYPHONE_CONFIRM_URL,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(
+          confirmBody
+        )
+      }
+    );
+
+    const payphoneData = await payphoneResponse.json();
+
+    if (!payphoneResponse.ok) {
+      console.error(
+        'Error Payphone Confirm:',
+        payphoneData
+      );
+
+      res.status(502).json({
+        error: 'No se pudo confirmar la transacción con Payphone.',
+        details: payphoneData
+      });
+
+      return;
+    }
+
+    // ====================================================
+    // 3. Validar transacción devuelta
+    // ====================================================
+
+    const montoEsperado = Math.round(
+      Number(
+        pedido.monto_total
+      ) * 100
+    );
+
+    const montoRecibido = Number(
+      payphoneData.amount
+    );
+
+    if (
+      montoRecibido !==
+      montoEsperado
+    ) {
+      console.error(
+        'Monto Payphone no coincide:',
+        {
+          pedidoId: pedido.id,
+          esperado: montoEsperado,
+          recibido: montoRecibido
+        }
+      );
+
+      res.status(400).json({
+        error: 'El monto confirmado por Payphone no coincide con el pedido.'
+      });
+
+      return;
+    }
+
+    if (
+      payphoneData.clientTransactionId !==
+      clientTransactionId
+    ) {
+      res.status(400).json({
+        error: 'El identificador de la transacción no coincide.'
+      });
+
+      return;
+    }
+
+    // ====================================================
+    // 4. Obtener estado
+    // ====================================================
+
+    const statusCode = Number(
+      payphoneData.statusCode
+    );
+
+    const transactionStatus = payphoneData.transactionStatus
+      ?.toString()
+      .trim()
+      .toLowerCase();
+
+    let nuevoEstado:
+      | 'aprobado'
+      | 'rechazado'
+      | 'pendiente';
+
+    if (
+      statusCode === 3 ||
+      transactionStatus === 'approved'
+    ) {
+      nuevoEstado = 'aprobado';
+    } else if (
+      statusCode === 2 ||
+      transactionStatus === 'canceled' ||
+      transactionStatus === 'cancelled'
+    ) {
+      nuevoEstado = 'rechazado';
+    } else {
+      nuevoEstado = 'pendiente';
+    }
+
+    // ====================================================
+    // 5. Actualizar BD
+    // ====================================================
+
+    await client.query('BEGIN');
+
+    await client.query(
+      `
+      UPDATE pedidos
+      SET estado_pago = $1
+      WHERE id = $2
+      `,
+      [
+        nuevoEstado,
+        pedido.id
+      ]
+    );
+
+    // ====================================================
+    // 6. Crear tracking técnico si aprobado
+    // ====================================================
+
+    if (
+      nuevoEstado === 'aprobado'
+    ) {
+      const itemsQuery = await client.query(
+        `
+        SELECT id
+        FROM pedido_items
+        WHERE pedido_id = $1
+        `,
+        [
+          pedido.id
+        ]
+      );
+
+      for (
+        const item of itemsQuery.rows
+      ) {
         await client.query(
-          `INSERT INTO tracking_tecnico (pedido_item_id) 
-           VALUES ($1) 
-           ON CONFLICT (pedido_item_id) DO NOTHING`,
-          [item.id]
+          `
+          INSERT INTO tracking_tecnico (
+            pedido_item_id
+          )
+          VALUES ($1)
+          ON CONFLICT (
+            pedido_item_id
+          )
+          DO NOTHING
+          `,
+          [
+            item.id
+          ]
         );
       }
     }
 
     await client.query('COMMIT');
 
-    // Redirigimos al usuario de regreso a la URL de retorno del Frontend pasándole el ID y el estado
-    const returnUrl = `${process.env.P2P_RETURN_URL}?pedidoId=${pedidoId}&status=${nuevoEstado}`;
-    res.redirect(returnUrl);
+    // ====================================================
+    // 7. Respuesta
+    // ====================================================
+
+    res.status(200).json({
+      message: 'Pago confirmado correctamente.',
+      pedidoId: pedido.id,
+      estadoPago: nuevoEstado,
+      transaccion: {
+        transactionId: payphoneData.transactionId,
+        transactionStatus: payphoneData.transactionStatus,
+        statusCode: payphoneData.statusCode,
+        authorizationCode: payphoneData.authorizationCode
+      }
+    });
 
   } catch (error) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Error al procesar el webhook simulado.' });
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // No hacer nada
+    }
+
+    console.error(
+      'Error confirmando pago Payphone:',
+      error
+    );
+
+    res.status(500).json({
+      error: 'Error confirmando el pago.',
+      details:
+        error instanceof Error
+          ? error.message
+          : error
+    });
+
   } finally {
     client.release();
   }

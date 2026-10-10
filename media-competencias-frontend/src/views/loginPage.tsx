@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 //import { useAuth } from "../context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Mail, Lock} from "lucide-react";
@@ -26,9 +26,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  useEffect(() => {
   if (user) {
     navigate("/");
   }
+}, [user, navigate]);
 
   // Handle Login con Email y Contraseña
   const handleEmailLogin = async (e: React.FormEvent) => {

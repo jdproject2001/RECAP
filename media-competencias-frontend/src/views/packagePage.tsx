@@ -5,6 +5,7 @@ import { useAuth } from "../context/authContext";
 import { useCart } from "../context/cartContext"; // <-- Asumiendo que esta es tu ruta
 import AuthModal from "../components/authModal";
 import { API_BASE } from '../config/api';
+import { auth } from "../firebase/firebase";
 
 interface Evento {
   id: string;
@@ -28,10 +29,17 @@ interface PaqueteDTO {
   nombre_paquete: string;
   descripcion?: string;
   precio: number | string;
-  tipo: 'foto' | 'video' | 'combo' ;
+  tipo: 'foto' | 'video' | 'combo';
   modalidad: 'SOLISTA_DUO' | 'GRUPAL' | 'TODOS' | string;
   cantidad_fotos?: number;
   tipo_formato?: string;
+}
+
+interface MultimediaDTO {
+  id: string;
+  tipo: 'FOTO' | 'VIDEO';
+  activo: boolean;
+  previewUrl: string | null;
 }
 
 const AVATAR_COLORS = [
@@ -42,19 +50,14 @@ const AVATAR_COLORS = [
 
 function initials(name: string) {
   if (!name) return "??";
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
+  return name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
 
 export default function PackagesPage() {
   const { eventId, participantId } = useParams<{ eventId: string; participantId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const { user } = useAuth();
   const { addToCart } = useCart(); // <-- Importamos la función del carrito
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -75,6 +78,10 @@ export default function PackagesPage() {
   const [selectedFotoPackageId, setSelectedFotoPackageId] = useState<string | null>(null);
   const [selectedComboPackageId, setSelectedComboPackageId] = useState<string | null>(null);
 
+  const [multimediaDisponibles, setMultimediaDisponibles] = useState<MultimediaDTO[] | null>(null);
+  const [checkingMedia, setCheckingMedia] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'ADD' | 'BUY' | null>(null);
+
   useEffect(() => {
     if (participante && evento && paquetesBD.length > 0) {
       setLoading(false);
@@ -87,7 +94,7 @@ export default function PackagesPage() {
         setError(null);
         const res = await fetch(`${API_BASE}/eventos/${eventId}/participantes/${participantId}`);
         if (!res.ok) throw new Error("No se pudo cargar la información del participante.");
-        
+
         const data = await res.json();
         setEvento(data.evento || null);
         setParticipante(data.participante || null);
@@ -141,40 +148,254 @@ export default function PackagesPage() {
   })();
 
   // ---- LÓGICA DE CARRITO Y COMPRA ----
-  const handleAddToCart = () => {
-    if (!activePackage || !participante) return;
-    
-    const paqueteParaCarrito = {
-      ...activePackage,
-      descripcion: activePackage.descripcion || "",
-      precio: Number(activePackage.precio), // 👈 Forzar conversión explícita a number
-      tipo: activePackage.tipo as 'foto' | 'video' | 'combo'
+
+  const obtenerMultimediaParticipante =
+    async (): Promise<MultimediaDTO[]> => {
+
+      // Si ya consultamos, no hacemos otra petición
+      if (multimediaDisponibles !== null) {
+        return multimediaDisponibles;
+      }
+
+      const firebaseUser = auth.currentUser;
+
+      if (!firebaseUser) {
+        throw new Error(
+          'Debes iniciar sesión para continuar.'
+        );
+      }
+
+      if (!participantId) {
+        throw new Error(
+          'No se encontró el participante.'
+        );
+      }
+
+      setCheckingMedia(true);
+
+      try {
+        const token = await firebaseUser.getIdToken();
+
+        const response = await fetch(
+          `${API_BASE}/multimedia/participante/${participantId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+            'No se pudo consultar el material disponible.'
+          );
+        }
+
+        const multimedia =
+          (data.multimedia || []) as MultimediaDTO[];
+
+        setMultimediaDisponibles(multimedia);
+
+        return multimedia;
+
+      } finally {
+        setCheckingMedia(false);
+      }
     };
 
-    addToCart(paqueteParaCarrito, participante);
+
+  const tieneMaterialSuficiente = (
+    paquete: PaqueteDTO,
+    multimedia: MultimediaDTO[]
+  ): boolean => {
+
+    const fotos = multimedia.filter(
+      item =>
+        item.tipo === 'FOTO' &&
+        item.activo &&
+        !!item.previewUrl
+    );
+
+    const videos = multimedia.filter(
+      item =>
+        item.tipo === 'VIDEO' &&
+        item.activo
+    );
+
+    const cantidadFotos =
+      Number(paquete.cantidad_fotos || 0);
+
+    if (paquete.tipo === 'foto') {
+      return fotos.length >= cantidadFotos;
+    }
+
+    if (paquete.tipo === 'video') {
+      return videos.length >= 1;
+    }
+
+    if (paquete.tipo === 'combo') {
+      return (
+        fotos.length >= cantidadFotos &&
+        videos.length >= 1
+      );
+    }
+
+    return false;
   };
 
-  const handleBuyNow = () => {
-    if (!activePackage || !participante) return;
 
-    const paqueteParaCarrito = {
-      ...activePackage,
-      descripcion: activePackage.descripcion || "",
-      precio: Number(activePackage.precio) // 👈 Forzar conversión explícita a number
-    };
+  const procesarPaquete = async (
+    accion: 'ADD' | 'BUY'
+  ) => {
 
-    addToCart(paqueteParaCarrito, participante);
+    if (
+      !activePackage ||
+      !participante ||
+      !eventId ||
+      !participantId
+    ) {
+      return;
+    }
 
-    if (!user) {
+    // Si no inició sesión guardamos lo que quería hacer
+    if (!auth.currentUser) {
+      setPendingAction(accion);
       setShowAuthModal(true);
-    } else {
-      proceedToCheckout();
+      return;
+    }
+
+    try {
+      setError(null);
+
+      const multimedia =
+        await obtenerMultimediaParticipante();
+
+      const hayMaterial =
+        tieneMaterialSuficiente(
+          activePackage,
+          multimedia
+        );
+
+      /*
+       * COMPRA DIRECTA
+       *
+       * Existe suficiente material.
+       * Todavía NO agregamos nada al carrito.
+       * Primero debe escoger los archivos.
+       */
+      console.log(
+  'ACTIVE PACKAGE ANTES DE NAVEGAR:',
+  activePackage
+);
+
+console.log(
+  'CANTIDAD FOTOS ACTIVE PACKAGE:',
+  activePackage.cantidad_fotos
+);
+      if (hayMaterial) {
+
+        navigate(
+          `/eventos/${eventId}/participantes/${participantId}/seleccionar-material`,
+          {
+            state: {
+              paquete: {
+                ...activePackage,
+                descripcion:
+                  activePackage.descripcion || '',
+                precio:
+                  Number(activePackage.precio),
+                cantidad_fotos:
+                  Number(
+                    activePackage.cantidad_fotos || 0
+                  )
+              },
+              
+              participante: {
+                id: participante.id,
+                nombre_completo:
+                  participante.nombre_completo,
+                dorsal_numero:
+                  participante.dorsal_numero
+              }
+            }
+          }
+        );
+
+        return;
+      }
+      
+
+      /*
+       * RESERVA
+       *
+       * Todavía no existe suficiente material.
+       */
+      const paqueteParaCarrito = {
+        ...activePackage,
+        descripcion:
+          activePackage.descripcion || '',
+        precio:
+          Number(activePackage.precio),
+        tipo:
+          activePackage.tipo as
+          | 'foto'
+          | 'video'
+          | 'combo'
+      };
+
+      addToCart(
+        paqueteParaCarrito,
+        participante,
+        [],
+        'RESERVA'
+      );
+
+      /*
+       * "Comprar ahora" manda directamente
+       * al carrito.
+       *
+       * "Añadir al carrito" permanece
+       * en esta página.
+       */
+      if (accion === 'BUY') {
+        navigate('/carrito');
+      }
+    } catch (err) {
+      console.error(
+        'Error procesando paquete:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo procesar el paquete.'
+      );
     }
   };
 
-  const proceedToCheckout = () => {
-    navigate('/carrito');
+  const handleAddToCart = () => { void procesarPaquete('ADD'); };
+  const handleBuyNow = () => { void procesarPaquete('BUY'); };
+
+  const continuarDespuesDeLogin = () => {
+    setShowAuthModal(false);
+    if (!pendingAction) {
+      return;
+    }
+
+    const accion = pendingAction;
+    setPendingAction(null);
+    void procesarPaquete(accion);
   };
+
+  // ------------------------------------
+  /*
+    const proceedToCheckout = () => {
+      navigate('/carrito');
+    };*/
   // ------------------------------------
 
   const avatarColor = AVATAR_COLORS[Math.abs((participante?.nombre_completo || "").length) % AVATAR_COLORS.length];
@@ -220,7 +441,7 @@ export default function PackagesPage() {
 
   return (
     <div className="min-h-screen bg-[#0D111C] text-white">
-      
+
       {/* SUB-BARRA "VOLVER" (Se queda pegada bajo el Navbar global h-20) */}
       <div className="sticky top-20 z-40 bg-[#0D111C]/90 backdrop-blur-md border-b border-slate-800 px-6 py-3 transition-all">
         <div className="max-w-5xl mx-auto flex items-center">
@@ -291,9 +512,8 @@ export default function PackagesPage() {
               return (
                 <div
                   onClick={() => setSelectedType('combo')}
-                  className={`relative flex flex-col rounded-2xl border cursor-pointer transition-all duration-200 overflow-hidden bg-[#12131A] ${
-                    isSelected ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] -translate-y-1" : "border-slate-800 hover:border-slate-700 hover:-translate-y-0.5"
-                  }`}
+                  className={`relative flex flex-col rounded-2xl border cursor-pointer transition-all duration-200 overflow-hidden bg-[#12131A] ${isSelected ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] -translate-y-1" : "border-slate-800 hover:border-slate-700 hover:-translate-y-0.5"
+                    }`}
                 >
                   <div className="bg-red-600/10 border-b border-red-500/20 px-4 py-1.5 flex items-center gap-1.5 text-[11px] font-bold text-red-400 uppercase tracking-wider">
                     <Sparkles size={13} /> MÁS POPULAR
@@ -317,9 +537,8 @@ export default function PackagesPage() {
                             <button
                               key={pkg.id} type="button"
                               onClick={() => { setSelectedType('combo'); setSelectedComboPackageId(pkg.id); }}
-                              className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${
-                                selectedComboPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
-                              }`}
+                              className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${selectedComboPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
+                                }`}
                               style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
                             >
                               {pkg.cantidad_fotos}
@@ -353,9 +572,8 @@ export default function PackagesPage() {
               return (
                 <div
                   onClick={() => setSelectedType('foto')}
-                  className={`relative flex flex-col rounded-2xl border cursor-pointer transition-all duration-200 overflow-hidden bg-[#12131A] ${
-                    isSelected ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] -translate-y-1" : "border-slate-800 hover:border-slate-700 hover:-translate-y-0.5"
-                  }`}
+                  className={`relative flex flex-col rounded-2xl border cursor-pointer transition-all duration-200 overflow-hidden bg-[#12131A] ${isSelected ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] -translate-y-1" : "border-slate-800 hover:border-slate-700 hover:-translate-y-0.5"
+                    }`}
                 >
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="text-red-500 mb-3"><Camera size={18} /></div>
@@ -369,9 +587,8 @@ export default function PackagesPage() {
                           <button
                             key={pkg.id} type="button"
                             onClick={() => { setSelectedType('foto'); setSelectedFotoPackageId(pkg.id); }}
-                            className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${
-                              selectedFotoPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
-                            }`}
+                            className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${selectedFotoPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
+                              }`}
                             style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
                           >
                             {pkg.cantidad_fotos || pkg.nombre_paquete.replace(/\D/g, "") || "1"}
@@ -402,9 +619,8 @@ export default function PackagesPage() {
               return (
                 <div
                   onClick={() => setSelectedType('video')}
-                  className={`relative flex flex-col rounded-2xl border cursor-pointer transition-all duration-200 overflow-hidden bg-[#12131A] ${
-                    isSelected ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] -translate-y-1" : "border-slate-800 hover:border-slate-700 hover:-translate-y-0.5"
-                  }`}
+                  className={`relative flex flex-col rounded-2xl border cursor-pointer transition-all duration-200 overflow-hidden bg-[#12131A] ${isSelected ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] -translate-y-1" : "border-slate-800 hover:border-slate-700 hover:-translate-y-0.5"
+                    }`}
                 >
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="text-red-500 mb-3"><Video size={18} /></div>
@@ -444,7 +660,7 @@ export default function PackagesPage() {
                 <span className="text-3xl font-black text-red-500 whitespace-nowrap" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
                   ${Number(activePackage.precio).toFixed(2)} USD
                 </span>
-                
+
                 {/* BOTONES DUALES DE CARRITO */}
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button
@@ -466,14 +682,15 @@ export default function PackagesPage() {
               </div>
             </div>
           )}
-
         </div>
       </div>
-
       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={proceedToCheckout}
+        onClose={() => {
+          setShowAuthModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={continuarDespuesDeLogin}
       />
     </div>
   );

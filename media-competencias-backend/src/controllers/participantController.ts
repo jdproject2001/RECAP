@@ -16,9 +16,9 @@ export const createParticipant = async (req: Request, res: Response): Promise<vo
       RETURNING *
     `;
     const result = await query(queryText, [
-      categoria_id, 
-      nombre_completo, 
-      dorsal_numero || null, 
+      categoria_id,
+      nombre_completo,
+      dorsal_numero || null,
       academia || null
     ]);
 
@@ -67,10 +67,19 @@ export const getParticipantWithPackages = async (req: Request, res: Response): P
 
     // 2. Obtener paquetes del evento correspondiente
     const packagesResult = await query(
-      `SELECT id, nombre_paquete, tipo, modalidad, precio 
-       FROM paquetes 
-       WHERE evento_id = $1 
-       ORDER BY precio ASC`,
+      `SELECT
+        id,
+        evento_id,
+        nombre_paquete,
+        descripcion,
+        precio,
+        tipo,
+        modalidad,
+        cantidad_fotos,
+        tipo_formato
+      FROM paquetes
+      WHERE evento_id = $1
+      ORDER BY precio ASC`,
       [participante.evento_id]
     );
 

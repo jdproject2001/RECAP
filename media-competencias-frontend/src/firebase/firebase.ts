@@ -20,9 +20,22 @@ export const googleProvider = new GoogleAuthProvider();
 export const loginWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
+    console.log(
+    'Firebase login correcto:',
+    result.user.uid,
+    result.user.email
+  );
     return result.user;
-  } catch (error) {
-    console.error("Error al autenticar con Google:", error);
+  } catch (error: any) {
+    console.error(
+    'Error al autenticar con Google:',
+    {
+      code: error?.code,
+      message: error?.message,
+      customData: error?.customData,
+      name: error?.name
+    }
+  );
     throw error;
   }
 };

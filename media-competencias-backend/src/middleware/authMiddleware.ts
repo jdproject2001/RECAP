@@ -1,3 +1,4 @@
+//auth.middleware
 import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../config/firebaseAdmin';
 
@@ -6,6 +7,7 @@ export interface AuthenticatedRequest extends Request {
     uid: string;
     email: string | undefined;
   };
+  userRoles?: number[];
 }
 
 export const authenticateFirebase = async (

@@ -94,15 +94,19 @@ export const getEventWithParticipants = async (req: Request, res: Response): Pro
 
     // 3. Paquetes asociados al evento
     const packagesPromise = query(
-      `SELECT 
-        id, 
-        nombre_paquete, 
-        tipo, 
-        modalidad, 
-        precio 
-       FROM paquetes 
-       WHERE evento_id = $1
-       ORDER BY precio ASC`,
+      `SELECT
+        id,
+        evento_id,
+        nombre_paquete,
+        descripcion,
+        precio,
+        tipo,
+        modalidad,
+        cantidad_fotos,
+        tipo_formato
+      FROM paquetes
+      WHERE evento_id = $1
+      ORDER BY precio ASC`,
       [eventId]
     );
 
@@ -136,7 +140,7 @@ export const getEventWithParticipants = async (req: Request, res: Response): Pro
 // 3. Obtener solo las categorías y paquetes de un evento específico (Útil para el Checkout)
 export const getEventDetails = async (req: Request, res: Response): Promise<void> => {
   const { eventId } = req.params;
-  
+
   try {
     const categoriesPromise = query(
       'SELECT id, nombre_categoria FROM categorias WHERE evento_id = $1',
@@ -201,16 +205,40 @@ export const getParticipantPackagesDetails = async (req: Request, res: Response)
 
     // 2. Obtener datos del Participante + Categoria
     const participantQuery = query(
-      `SELECT p.id, p.nombre_completo, p.dorsal_numero, c.nombre_categoria
-       FROM participantes p
-       INNER JOIN categorias c ON p.categoria_id = c.id
-       WHERE p.id = $1 AND c.evento_id = $2`,
+      `
+      SELECT
+        p.id,
+        p.nombre_completo,
+        p.dorsal_numero,
+        p.academia,
+        c.nombre_categoria,
+        c.tipo_categoria
+      FROM participantes p
+      INNER JOIN categorias c
+        ON p.categoria_id = c.id
+      WHERE p.id = $1
+        AND c.evento_id = $2
+      `,
       [participantId, eventId]
     );
 
     // 3. Obtener Paquetes disponibles para este evento
     const packagesQuery = query(
-      'SELECT id, nombre_paquete, descripcion, precio, tipo FROM paquetes WHERE evento_id = $1',
+      `
+      SELECT
+        id,
+        evento_id,
+        nombre_paquete,
+        descripcion,
+        precio,
+        tipo,
+        modalidad,
+        cantidad_fotos,
+        tipo_formato
+      FROM paquetes
+      WHERE evento_id = $1
+      ORDER BY precio ASC
+      `,
       [eventId]
     );
 
