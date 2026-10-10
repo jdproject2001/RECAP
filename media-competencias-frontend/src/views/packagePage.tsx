@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Camera, Video, ShoppingCart, Sparkles, Plus } from "lucide-react";
-import { useAuth } from "../context/authContext";
 import { useCart } from "../context/cartContext"; // <-- Asumiendo que esta es tu ruta
 import AuthModal from "../components/authModal";
 import { API_BASE } from '../config/api';
@@ -31,7 +30,7 @@ interface PaqueteDTO {
   precio: number | string;
   tipo: 'foto' | 'video' | 'combo';
   modalidad: 'SOLISTA_DUO' | 'GRUPAL' | 'TODOS' | string;
-  cantidad_fotos?: number;
+  cantidad_fotos?: number | null;
   tipo_formato?: string;
 }
 
@@ -57,8 +56,6 @@ export default function PackagesPage() {
   const { eventId, participantId } = useParams<{ eventId: string; participantId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const { user } = useAuth();
   const { addToCart } = useCart(); // <-- Importamos la función del carrito
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -79,7 +76,7 @@ export default function PackagesPage() {
   const [selectedComboPackageId, setSelectedComboPackageId] = useState<string | null>(null);
 
   const [multimediaDisponibles, setMultimediaDisponibles] = useState<MultimediaDTO[] | null>(null);
-  const [checkingMedia, setCheckingMedia] = useState(false);
+  const [, setCheckingMedia] = useState(false);
   const [pendingAction, setPendingAction] = useState<'ADD' | 'BUY' | null>(null);
 
   useEffect(() => {
@@ -114,8 +111,23 @@ export default function PackagesPage() {
 
   const paquetesFoto = useMemo(() => {
     return paquetesBD
-      .filter((p) => p.tipo.toLowerCase() === "foto")
-      .sort((a, b) => Number(a.cantidad_fotos || 0) - Number(b.cantidad_fotos || 0));
+      .filter(
+        (p) =>
+          p.tipo.toLowerCase() === "foto"
+      )
+      .sort((a, b) => {
+        const cantidadA =
+          a.cantidad_fotos == null
+            ? Number.MAX_SAFE_INTEGER
+            : Number(a.cantidad_fotos);
+
+        const cantidadB =
+          b.cantidad_fotos == null
+            ? Number.MAX_SAFE_INTEGER
+            : Number(b.cantidad_fotos);
+
+        return cantidadA - cantidadB;
+      });
   }, [paquetesBD]);
 
   const paquetesVideo = useMemo(() => {
@@ -124,8 +136,23 @@ export default function PackagesPage() {
 
   const paquetesCombo = useMemo(() => {
     return paquetesBD
-      .filter((p) => p.tipo.toLowerCase() === "combo")
-      .sort((a, b) => Number(a.cantidad_fotos || 0) - Number(b.cantidad_fotos || 0));
+      .filter(
+        (p) =>
+          p.tipo.toLowerCase() === "combo"
+      )
+      .sort((a, b) => {
+        const cantidadA =
+          a.cantidad_fotos == null
+            ? Number.MAX_SAFE_INTEGER
+            : Number(a.cantidad_fotos);
+
+        const cantidadB =
+          b.cantidad_fotos == null
+            ? Number.MAX_SAFE_INTEGER
+            : Number(b.cantidad_fotos);
+
+        return cantidadA - cantidadB;
+      });
   }, [paquetesBD]);
 
   useEffect(() => {
@@ -226,20 +253,61 @@ export default function PackagesPage() {
     );
 
     const cantidadFotos =
-      Number(paquete.cantidad_fotos || 0);
+      paquete.cantidad_fotos;
 
-    if (paquete.tipo === 'foto') {
-      return fotos.length >= cantidadFotos;
-    }
+    // =====================================
+    // SOLO VIDEO
+    // =====================================
 
     if (paquete.tipo === 'video') {
       return videos.length >= 1;
     }
 
-    if (paquete.tipo === 'combo') {
+    // =====================================
+    // SOLO FOTO
+    // =====================================
+
+    if (paquete.tipo === 'foto') {
+
+      // NULL = ilimitadas
+      if (cantidadFotos == null) {
+        return fotos.length > 0;
+      }
+
+      // 0 = no debería existir
+      // para un paquete solo foto
+      if (cantidadFotos === 0) {
+        return false;
+      }
+
       return (
-        fotos.length >= cantidadFotos &&
-        videos.length >= 1
+        fotos.length >= cantidadFotos
+      );
+    }
+
+    // =====================================
+    // COMBO
+    // =====================================
+
+    if (paquete.tipo === 'combo') {
+
+      if (videos.length === 0) {
+        return false;
+      }
+
+      // NULL = fotos ilimitadas
+      // Debe existir al menos una foto.
+      if (cantidadFotos == null) {
+        return fotos.length > 0;
+      }
+
+      // 0 significaría combo sin fotos.
+      if (cantidadFotos === 0) {
+        return true;
+      }
+
+      return (
+        fotos.length >= cantidadFotos
       );
     }
 
@@ -287,14 +355,14 @@ export default function PackagesPage() {
        * Primero debe escoger los archivos.
        */
       console.log(
-  'ACTIVE PACKAGE ANTES DE NAVEGAR:',
-  activePackage
-);
+        'ACTIVE PACKAGE ANTES DE NAVEGAR:',
+        activePackage
+      );
 
-console.log(
-  'CANTIDAD FOTOS ACTIVE PACKAGE:',
-  activePackage.cantidad_fotos
-);
+      console.log(
+        'CANTIDAD FOTOS ACTIVE PACKAGE:',
+        activePackage.cantidad_fotos
+      );
       if (hayMaterial) {
 
         navigate(
@@ -309,10 +377,10 @@ console.log(
                   Number(activePackage.precio),
                 cantidad_fotos:
                   Number(
-                    activePackage.cantidad_fotos || 0
+                    activePackage.cantidad_fotos
                   )
               },
-              
+
               participante: {
                 id: participante.id,
                 nombre_completo:
@@ -326,7 +394,7 @@ console.log(
 
         return;
       }
-      
+
 
       /*
        * RESERVA
@@ -537,11 +605,13 @@ console.log(
                             <button
                               key={pkg.id} type="button"
                               onClick={() => { setSelectedType('combo'); setSelectedComboPackageId(pkg.id); }}
-                              className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${selectedComboPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
+                              className={`flex-1 py-1.5 rounded-lg text-sm font-black border transition-all cursor-pointer ${selectedComboPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
                                 }`}
                               style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
                             >
-                              {pkg.cantidad_fotos}
+                              {pkg.cantidad_fotos == null
+                                ? 'ILIMITADAS'
+                                : `${pkg.cantidad_fotos} FOTOS`}
                             </button>
                           ))}
                         </div>
@@ -649,11 +719,15 @@ console.log(
                 <p className="text-xs text-slate-400 mb-0.5">Paquete seleccionado</p>
                 <p className="font-bold text-white uppercase text-lg" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
                   {selectedType === 'combo' ? 'FOTO + VIDEO' : selectedType === 'foto' ? 'SOLO FOTO' : 'SOLO VIDEO'}
-                  {activePackage.cantidad_fotos ? (
+                  {activePackage.tipo !== 'video' && (
                     <span className="text-slate-400 font-normal ml-2 text-sm normal-case">
-                      — {activePackage.cantidad_fotos} fotos
+                      {activePackage.cantidad_fotos == null
+                        ? '— fotos ilimitadas'
+                        : activePackage.cantidad_fotos > 0
+                          ? `— ${activePackage.cantidad_fotos} fotos`
+                          : ''}
                     </span>
-                  ) : null}
+                  )}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">

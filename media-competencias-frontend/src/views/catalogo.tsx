@@ -187,7 +187,7 @@ export const Catalogo: React.FC = () => {
                   <div className="mt-6">
                     <div className="text-2xl font-black text-slate-900 mb-3">${(paj.precio).toFixed(2)}</div>
                     <button
-                      onClick={() => addToCart(paj, selectedParticipante)}
+                      onClick={() => addToCart(paj, selectedParticipante, [], 'RESERVA')}
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors shadow-xs cursor-pointer"
                     >
                       Añadir al Carrito

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Image as ImageIcon, Loader2, ShoppingCart, Video } from 'lucide-react';
 import { useCart } from '../context/cartContext';
-import { useAuth } from '../context/authContext';
 import { API_BASE } from '../config/api';
 import { auth } from '../firebase/firebase';
 
@@ -48,12 +47,8 @@ export default function MediaSelectionPage() {
     pedidoItemId?: string;
   }>();
   
-
-  const { user } = useAuth();
   const { addToCart } = useCart();
-
   const state = location.state as LocationState | null;
-
   const paquete = state?.paquete;
   const participante = state?.participante;
   const modo = state?.modo || 'DIRECTA';

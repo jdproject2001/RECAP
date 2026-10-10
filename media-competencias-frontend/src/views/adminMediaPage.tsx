@@ -40,7 +40,7 @@ export default function AdminMediaPage() {
     const [fotos, setFotos] = useState<UploadItem[]>([]);
     const [video, setVideo] = useState<UploadItem | null>(null);
     const [loadingEventos, setLoadingEventos] = useState(true);
-    const [loadingParticipantes, setLoadingParticipantes] = useState(false);
+    const [, setLoadingParticipantes] = useState(false);
     const [subiendoFotos, setSubiendoFotos] = useState(false);
     const [subiendoVideo, setSubiendoVideo] = useState(false);
     const [error, setError] = useState<string | null>(null);
