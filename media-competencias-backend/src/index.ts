@@ -9,7 +9,6 @@ import orderRoutes from './routes/orderRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import participantRoutes from './routes/participantRoutes';
 import authRoutes from './routes/authRoutes';
-import r2TestRoutes from './routes/r2testroutes';
 import multimediaRoutes from './routes/multimediaRoutes';
 
 dotenv.config();
