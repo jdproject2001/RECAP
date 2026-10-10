@@ -40,7 +40,7 @@ export const getEventWithParticipants = async (req: Request, res: Response): Pro
        FROM participantes p
        INNER JOIN categorias c ON p.categoria_id = c.id
        WHERE c.evento_id = $1
-       ORDER BY c.nombre_categoria ASC, p.dorsal_numero ASC`,
+       ORDER BY p.dorsal_numero ASC`,
       [eventId]
     );
 
