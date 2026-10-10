@@ -16,54 +16,6 @@ export const getActiveEvents = async (req: Request, res: Response): Promise<void
   }
 };
 
-// 2. Obtener un evento con TODOS sus participantes (Para EventPage.tsx en el Frontend)
-/*
-export const getEventWithParticipants = async (req: Request, res: Response): Promise<void> => {
-  const { eventId } = req.params;
-
-  try {
-    // Consulta A: Datos generales del Evento
-    const eventPromise = query(
-      'SELECT id, nombre, fecha, lugar, activo FROM eventos WHERE id = $1',
-      [eventId]
-    );
-
-    // Consulta B: Todos los Participantes del evento (Relación: eventos -> categorias -> participantes)
-    const participantsPromise = query(
-      `SELECT 
-        p.id, 
-        p.nombre_completo, 
-        p.dorsal_numero, 
-        c.nombre_categoria,
-        c.id AS categoria_id
-       FROM participantes p
-       INNER JOIN categorias c ON p.categoria_id = c.id
-       WHERE c.evento_id = $1
-       ORDER BY p.nombre_completo ASC`,
-      [eventId]
-    );
-
-    const [eventResult, participantsResult] = await Promise.all([eventPromise, participantsPromise]);
-
-    // Validar si el evento existe
-    if (eventResult.rows.length === 0) {
-      res.status(404).json({ error: 'Evento no encontrado' });
-      return;
-    }
-
-    // Respuesta EXACTA que espera tu frontend para quitar la pantalla de carga
-    res.json({
-      evento: eventResult.rows[0],
-      participantes: participantsResult.rows
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Error al obtener la información del evento y participantes',
-      details: error instanceof Error ? error.message : error
-    });
-  }
-};*/
-
 export const getEventWithParticipants = async (req: Request, res: Response): Promise<void> => {
   const { eventId } = req.params;
 
@@ -88,7 +40,7 @@ export const getEventWithParticipants = async (req: Request, res: Response): Pro
        FROM participantes p
        INNER JOIN categorias c ON p.categoria_id = c.id
        WHERE c.evento_id = $1
-       ORDER BY c.nombre_categoria ASC, p.nombre_completo ASC`,
+       ORDER BY c.nombre_categoria ASC, p.dorsal_numero ASC`,
       [eventId]
     );
 
