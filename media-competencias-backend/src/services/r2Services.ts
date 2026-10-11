@@ -110,7 +110,11 @@ export const downloadFromR2 = async (
 
   const bytes = await result.Body.transformToByteArray();
 
-  return Buffer.from(bytes);
+  return Buffer.from(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength
+  );
 };
 
 // =====================================================

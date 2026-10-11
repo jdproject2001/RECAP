@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import { query } from '../db';
 import { generateUploadUrl, checkObjectExists, generateDownloadUrl } from '../services/r2Services';
 import { generatePhotoPreview } from '../services/previewService';
+import { ejecutarPreviewEnCola } from '../services/previewQueue';
 
 // =====================================================
 // Verificar que el usuario tenga rol técnico o admin
@@ -358,9 +359,8 @@ export const confirmMultimediaUpload = async (
     let previewKey: string | null = null;
 
     if (tipoDB === 'FOTO') {
-
-      previewKey = await generatePhotoPreview(
-        r2Key
+      previewKey = await ejecutarPreviewEnCola(
+        () => generatePhotoPreview(r2Key)
       );
 
       await query(

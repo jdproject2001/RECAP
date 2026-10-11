@@ -1,57 +1,50 @@
 import sharp from 'sharp';
 import { uploadPreviewToR2, downloadFromR2 } from './r2Services';
 
-// =====================================================
-// Generar preview de una foto
-// =====================================================
+sharp.cache(false);
+sharp.concurrency(1);
+
+const watermarkSvg = `
+  <svg width="600" height="120">
+    <style>
+      .watermark {
+        fill: white;
+        fill-opacity: 0.45;
+        font-size: 64px;
+        font-family: Arial, sans-serif;
+        font-weight: bold;
+      }
+    </style>
+    <text
+      x="300"
+      y="75"
+      text-anchor="middle"
+      class="watermark"
+    >
+      RECAP
+    </text>
+  </svg>
+`;
+
+const watermarkBuffer = Buffer.from(watermarkSvg);
 
 export const generatePhotoPreview = async (
   originalKey: string
 ): Promise<string> => {
-
-  // ---------------------------------------------
-  // Descargar original desde R2
-  // ---------------------------------------------
+  const previewKey = originalKey
+    .replace('/original/', '/preview/')
+    .replace(/\.[^/.]+$/, '.jpg');
 
   const originalBuffer = await downloadFromR2(originalKey);
 
-  // ---------------------------------------------
-  // Crear marca de agua
-  // ---------------------------------------------
-
-  const watermarkSvg = `
-    <svg width="600" height="120">
-      <style>
-        .watermark {
-          fill: white;
-          fill-opacity: 0.45;
-          font-size: 64px;
-          font-family: Arial, sans-serif;
-          font-weight: bold;
-        }
-      </style>
-
-      <text
-        x="300"
-        y="75"
-        text-anchor="middle"
-        class="watermark"
-      >
-        RECAP
-      </text>
-    </svg>
-  `;
-
-  const watermarkBuffer = Buffer.from(watermarkSvg);
-
-  // ---------------------------------------------
-  // Procesar imagen
-  // ---------------------------------------------
-
-  const previewBuffer = await sharp(originalBuffer)
+  const previewBuffer = await sharp(originalBuffer, {
+    sequentialRead: true,
+    limitInputPixels: 268402689
+  })
+    .rotate()
     .resize({
-      width: 1600,
-      height: 1600,
+      width: 1200,
+      height: 1200,
       fit: 'inside',
       withoutEnlargement: true
     })
@@ -62,30 +55,12 @@ export const generatePhotoPreview = async (
       }
     ])
     .jpeg({
-      quality: 75
+      quality: 72,
+      mozjpeg: true
     })
     .toBuffer();
 
-  // ---------------------------------------------
-  // Construir key del preview
-  // ---------------------------------------------
-
-  const previewKey = originalKey.replace(
-    '/original/',
-    '/preview/'
-  ).replace(
-    /\.[^/.]+$/,
-    '.jpg'
-  );
-
-  // ---------------------------------------------
-  // Subir preview
-  // ---------------------------------------------
-
-  await uploadPreviewToR2(
-    previewKey,
-    previewBuffer
-  );
+  await uploadPreviewToR2(previewKey, previewBuffer);
 
   return previewKey;
 };
