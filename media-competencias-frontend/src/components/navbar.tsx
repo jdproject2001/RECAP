@@ -15,28 +15,26 @@ export default function Navbar() {
   return (
     <nav className="border-b border-slate-800/60 bg-[#0D111C]/80 backdrop-blur-md sticky top-0 z-50 transition-all">
       <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-
         {/* LOGO RECAP DANCE */}
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+        <Link to="/" className="flex items-center gap-3 group shrink-0" aria-label="Ir al inicio de RECAP DANCE">
+          <img src="/favicon.png" alt="" className="w-11 h-11 sm:w-12 sm:h-12 object-contain transition-transform duration-300 group-hover:scale-105"/>
           <div className="flex flex-col leading-none">
-            <span
-              className="text-lg font-black text-white uppercase"
-              style={{ fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: '0.18em' }}
-            >
-              RECAP
-            </span>
-            <span
-              className="text-[10px] font-semibold text-red-500 uppercase"
-              style={{ fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: '0.22em' }}
-            >
-              DANCE
-            </span>
+            <span className="text-lg font-black text-white uppercase group-hover:text-red-400 transition-colors" 
+              style={{
+                fontFamily: '"Barlow Condensed", sans-serif',
+                letterSpacing: '0.18em'
+              }}
+            >RECAP </span>
+            <span className="text-[10px] font-semibold text-red-500 uppercase"
+              style={{
+                fontFamily: '"Barlow Condensed", sans-serif',
+                letterSpacing: '0.22em'
+              }}
+            >DANCE </span>
           </div>
-        </div>
-
+        </Link>
         {/* ACCIONES, ENLACES Y CARRITO (Dentro del contenedor principal) */}
-        <div className="flex items-center gap-6">
-
+        <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
           {/* ENLACES DE NAVEGACIÓN */}
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
             <Link to="/" className="text-white hover:text-red-400 transition-colors">Inicio</Link>
@@ -107,9 +105,7 @@ export default function Navbar() {
               </>
             )}
           </div>
-
         </div>
-
       </div>
     </nav>
   );
