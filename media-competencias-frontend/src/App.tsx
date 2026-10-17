@@ -26,11 +26,13 @@ function AppRoutes() {
           {/* 1. Ruta Principal */}
           <Route path="/" element={<Home />} />
           
-          {/* 2. Ruta Dinámica para Detalle del Evento */}
-          <Route path="/evento/:eventId" element={<EventPage />} />
+          {/* 2. Ruta Dinámica para Detalle del Evento 
+          <Route path="/evento/:eventId" element={<EventPage />} />*/}
+
+          <Route path="/:eventSlug" element={<EventPage />} />
 
           {/* 3. Ruta para ver los paquetes del participante */}
-          <Route path="/evento/:eventId/participante/:participantId" element={<PackagesPage />} />
+          <Route path="/:eventSlug/participante/:participantId" element={<PackagesPage />} />
 
           {/* 4. RUTA ADMIN: Formulario para ingresar participantes */}
           <Route path="/evento/:eventId/admin/participantes" element={<AdminAddParticipantPage />} />

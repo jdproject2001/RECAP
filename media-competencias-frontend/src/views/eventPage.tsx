@@ -10,6 +10,7 @@ interface Evento {
   fecha: string;
   lugar: string;
   activo: boolean;
+  slug: string,
   imagen_url?: string;
 }
 
@@ -33,7 +34,8 @@ interface PaqueteDTO {
 }
 
 export default function EventPage() {
-  const { eventId } = useParams<{ eventId: string }>();
+  //const { eventId } = useParams<{ eventId: string }>();
+  const { eventSlug } = useParams<{ eventSlug: string }>();
   const navigate = useNavigate();
 
   const [evento, setEvento] = useState<Evento | null>(null);
@@ -48,8 +50,8 @@ export default function EventPage() {
 
   // Obtención de datos del Backend
   useEffect(() => {
-    if (!eventId) {
-      setError("ID de evento no proporcionado.");
+    if (!eventSlug) {
+      setError("Evento no encontrado");
       setLoading(false);
       return;
     }
@@ -59,11 +61,11 @@ export default function EventPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`${API_BASE}/eventos/${eventId}`);
+        const res = await fetch(`${API_BASE}/eventos/slug/${eventSlug}`);
         if (!res.ok) throw new Error(`Error ${res.status}: No se pudo cargar el evento`);
 
         const data = await res.json();
-        
+
         setEvento(data.evento || null);
         setParticipantes(data.participantes || []);
         setPaquetes(data.paquetes || []);
@@ -76,7 +78,7 @@ export default function EventPage() {
     };
 
     fetchEventData();
-  }, [eventId]);
+  }, [eventSlug]);
 
   // Extraer categorías dinámicas desde los participantes recibidos
   const categories = useMemo(() => {
@@ -88,8 +90,8 @@ export default function EventPage() {
   const filtered = useMemo(() => {
     const queryLower = search.toLowerCase();
     return participantes.filter((p) => {
-      const matchSearch = 
-        p.nombre_completo.toLowerCase().includes(queryLower) || 
+      const matchSearch =
+        p.nombre_completo.toLowerCase().includes(queryLower) ||
         (p.dorsal_numero && p.dorsal_numero.toString().includes(queryLower)) ||
         (p.academia && p.academia.toLowerCase().includes(queryLower));
 
@@ -110,11 +112,15 @@ export default function EventPage() {
       return pkg.modalidad === 'SOLISTA_DUO';
     });
 
-    navigate(`/evento/${eventId}/participante/${participant.id}`, {
-      state: { 
-        participante: participant, 
+    if (!evento) {
+      return;
+    }
+
+    navigate(`/${eventSlug}/participante/${participant.id}`, {
+      state: {
+        participante: participant,
         evento: evento,
-        paquetes: paquetesFiltrados.length > 0 ? paquetesFiltrados : paquetes 
+        paquetes: paquetesFiltrados.length > 0 ? paquetesFiltrados : paquetes
       }
     });
   };
@@ -160,8 +166,8 @@ export default function EventPage() {
       <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center text-slate-400">
         <div className="text-center space-y-4">
           <p className="text-lg text-slate-300 font-medium">{error || "Evento no encontrado"}</p>
-          <button 
-            onClick={() => navigate('/')} 
+          <button
+            onClick={() => navigate('/')}
             className="px-4 py-2 bg-red-600 text-white text-sm rounded-xl hover:bg-red-500 transition-colors cursor-pointer"
           >
             Volver al Inicio
@@ -198,45 +204,42 @@ export default function EventPage() {
       </nav>
 
       {/* EVENT HERO */}
-      <div className="pt-[72px]">
-        <div className="relative h-[38vh] min-h-[260px] overflow-hidden bg-slate-900">
-          <img
-            src={evento.imagen_url || "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=1200&h=500&fit=crop&auto=format"}
-            alt={evento.nombre}
-            className="w-full h-full object-cover object-center opacity-60"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/60 to-transparent" />
-          
-          <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 max-w-6xl mx-auto">
-            <p className="text-red-500 text-xs font-semibold tracking-[0.3em] uppercase mb-2" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-              Galería del evento
-            </p>
-            <h1 className="text-4xl md:text-5xl font-black uppercase leading-tight text-white mb-3" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-              {evento.nombre}
-            </h1>
-            <div className="flex flex-wrap items-center gap-5 text-xs sm:text-sm text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar size={14} className="text-red-500" />
-                {new Date(evento.fecha).toLocaleDateString('es-ES', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <MapPin size={14} className="text-red-500" />
-                {evento.lugar}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Users size={14} className="text-red-500" />
-                {participantes.length} Participantes
-              </span>
-            </div>
+      <div className="relative h-[220px] md:h-[260px] overflow-hidden bg-slate-900">
+        <img
+          src={evento.imagen_url || "https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=1200&h=500&fit=crop&auto=format"}
+          alt={evento.nombre}
+          className="w-full h-full object-cover object-top opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/55 to-transparent" />
+
+        <div className="absolute bottom-0 left-0 right-0 px-6 lg:px-10 pb-6 max-w-[1400px] mx-auto">
+          <p className="text-red-500 text-xs font-semibold tracking-[0.3em] uppercase mb-2" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
+            Galería del evento
+          </p>
+          <h1 className="text-3xl md:text-4xl font-black uppercase leading-tight text-white mb-3" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
+            {evento.nombre}
+          </h1>
+          <div className="flex flex-wrap items-center gap-5 text-xs sm:text-sm text-slate-300">
+            <span className="flex items-center gap-1.5">
+              <Calendar size={14} className="text-red-500" />
+              {new Date(evento.fecha).toLocaleDateString('es-ES', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MapPin size={14} className="text-red-500" />
+              {evento.lugar}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Users size={14} className="text-red-500" />
+              {participantes.length} Participantes
+            </span>
           </div>
         </div>
       </div>
-
       {/* FILTROS */}
       <div className="px-6 py-5 border-b border-slate-800/80 bg-[#131926]/60 sticky top-[72px] z-30 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto flex flex-col gap-4">
+        <div className="max-w-[1400px] mx-auto flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -248,11 +251,11 @@ export default function EventPage() {
             </div>
 
             {/* Select de Categoría */}
-            <div className="relative">
+            <div className="relative flex-1 max-w-xl">
               <select
                 value={activeCategory}
                 onChange={(e) => setActiveCategory(e.target.value)}
-                className="appearance-none bg-[#0B0F17] border border-slate-800 text-slate-200 text-sm pl-3 pr-8 py-2 rounded-xl focus:outline-none focus:border-red-500/60 transition-colors cursor-pointer min-w-[180px] font-medium"
+                className="appearance-none bg-[#0B0F17] border border-slate-800 text-slate-200 text-sm pl-3 pr-8 py-2 rounded-xl focus:outline-none focus:border-red-500/60 transition-colors cursor-pointer min-w-[260px] font-medium"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat} className="bg-[#0B0F17]">
@@ -266,9 +269,9 @@ export default function EventPage() {
         </div>
       </div>
 
-      {/* TABLA DE PARTICIPANTES */}
-      <div className="px-6 py-8">
-        <div className="max-w-6xl mx-auto">
+      {/* TABLA DE PARTICIPANTE S */}
+      <div className="px-6 lg:px-10 py-8">
+        <div className="max-w-[1400px] mx-auto">
           <p className="text-xs text-slate-400 mb-4 tracking-wide font-medium">
             {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
           </p>
@@ -280,14 +283,14 @@ export default function EventPage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-[#131926]/30">
-              <table className="w-full text-sm text-left">
+              <table className="w-full min-w-[1100px] text-sm text-left table-fixed">
                 <thead>
                   <tr className="bg-[#131926] border-b border-slate-800">
-                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-12">N°</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-24">Dorsal</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase">Participante</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase">Academia</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase">Categoría</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-[55px]">N°</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-[90px]">Orden</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-[25%]">Participante</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-[22%]">Academia</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-[38%]">Categoría</th>
                     <th className="w-10" />
                   </tr>
                 </thead>
@@ -315,9 +318,9 @@ export default function EventPage() {
                           <span className="text-slate-600 italic">Independiente</span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-300 bg-slate-800 border border-slate-700/60 px-2.5 py-1 rounded-md">
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-300 bg-slate-800 border border-slate-700/60 px-2.5 py-1 rounded-md leading-relaxed">
                             {participant.nombre_categoria}
                           </span>
                           {renderTipoBadge(participant.tipo_categoria)}

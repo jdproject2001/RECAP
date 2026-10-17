@@ -5,7 +5,7 @@ import { query } from '../db'; // Ajusta la ruta a tu archivo db según correspo
 export const getActiveEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await query(
-      'SELECT id, nombre, fecha, lugar, activo FROM eventos WHERE activo = true ORDER BY fecha ASC'
+      'SELECT id, nombre, fecha, lugar, slug, activo, imagen_url FROM eventos WHERE activo = true ORDER BY fecha ASC'
     );
     res.json(result.rows);
   } catch (error) {
@@ -22,7 +22,7 @@ export const getEventWithParticipants = async (req: Request, res: Response): Pro
   try {
     // 1. Datos generales del Evento
     const eventPromise = query(
-      'SELECT id, nombre, fecha, lugar, activo FROM eventos WHERE id = $1',
+      'SELECT id, nombre, fecha, lugar, imagen_url, activo FROM eventos WHERE id = $1',
       [eventId]
     );
 
@@ -153,7 +153,7 @@ export const getParticipantPackagesDetails = async (req: Request, res: Response)
 
   try {
     // 1. Obtener datos del Evento
-    const eventQuery = query('SELECT id, nombre, fecha, lugar FROM eventos WHERE id = $1', [eventId]);
+    const eventQuery = query('SELECT id, nombre, fecha, lugar, imagen_url FROM eventos WHERE id = $1', [eventId]);
 
     // 2. Obtener datos del Participante + Categoria
     const participantQuery = query(
@@ -227,5 +227,114 @@ export const getEventCategories = async (req: Request, res: Response): Promise<v
   } catch (error) {
     console.error('Error al obtener categorías del evento:', error);
     res.status(500).json({ error: 'Error al consultar las categorías en la base de datos' });
+  }
+};
+
+export const getEventoBySlug = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { slug } = req.params;
+
+    const eventoResult = await query(
+      `
+      SELECT
+        id,
+        nombre,
+        slug,
+        fecha,
+        lugar,
+        activo,
+        imagen_url
+      FROM eventos
+      WHERE slug = $1
+      LIMIT 1
+      `,
+      [slug]
+    );
+
+    if (eventoResult.rows.length === 0) {
+      res.status(404).json({
+        error: 'Evento no encontrado.'
+      });
+
+      return;
+    }
+
+    const evento = eventoResult.rows[0];
+
+    const eventId = evento.id;
+
+    const participantsPromise = query(
+      `
+      SELECT
+        p.id,
+        p.nombre_completo,
+        p.dorsal_numero,
+        p.academia,
+        c.id AS categoria_id,
+        c.nombre_categoria,
+        c.tipo_categoria
+      FROM participantes p
+      INNER JOIN categorias c
+        ON p.categoria_id = c.id
+      WHERE c.evento_id = $1
+      ORDER BY
+        c.nombre_categoria ASC,
+        p.dorsal_numero ASC
+      `,
+      [eventId]
+    );
+
+    const categoriesPromise = query(
+      `
+      SELECT *
+      FROM categorias
+      WHERE evento_id = $1
+      ORDER BY orden_categoria ASC
+      `,
+      [eventId]
+    );
+
+    const packagesPromise = query(
+      `
+      SELECT *
+      FROM paquetes
+      WHERE evento_id = $1
+      `,
+      [eventId]
+    );
+
+    const [
+      participantsResult,
+      categoriesResult,
+      packagesResult
+    ] = await Promise.all([
+      participantsPromise,
+      categoriesPromise,
+      packagesPromise
+    ]);
+
+    res.status(200).json({
+      evento,
+      participantes:
+        participantsResult.rows,
+      categorias:
+        categoriesResult.rows,
+      paquetes:
+        packagesResult.rows
+    });
+
+  } catch (error) {
+    console.error(
+      'Error obteniendo evento por slug:',
+      error
+    );
+
+    res.status(500).json({
+      error:
+        'Error obteniendo el evento.'
+    });
   }
 };

@@ -9,14 +9,11 @@ interface Evento {
     fecha: string;
     lugar: string;
     activo: boolean;
+    slug: string,
     imagen_url?: string;
 }
 
-interface HomeProps {
-    onNavigateToCatalog?: () => void;
-}
-
-export const Home: React.FC<HomeProps> = ({ onNavigateToCatalog }) => {
+export const Home: React.FC = () => {
     const navigate = useNavigate();
     const [eventos, setEventos] = useState<Evento[]>([]);
     const [loading, setLoading] = useState(true);
@@ -35,12 +32,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToCatalog }) => {
                 }
 
                 const data = await respuesta.json();
-                
+
                 // Filtrar eventos activos
                 const eventosActivos = data.filter((ev: Evento) => {
                     return ev.activo === true || String(ev.activo).toLowerCase() === 'true' || Number(ev.activo) === 1;
                 });
-                
+
                 setEventos(eventosActivos);
             } catch (err: any) {
                 setError(err.message || 'Error al conectar con la base de datos');
@@ -61,56 +58,16 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToCatalog }) => {
         );
     });
 
-    const handleSelectEvento = (eventoId: string) => {
-        // Redirige dinámicamente al detalle del evento seleccionado
-        navigate(`/evento/${eventoId}`);
-        if (onNavigateToCatalog) {
-            onNavigateToCatalog();
-        }
+    const handleSelectEvento = (eventoSlug: string) => {
+        console.log(
+    'NAVEGANDO A EVENTO:',
+    eventoSlug
+  );
+        navigate(`/${eventoSlug}`);
     };
 
     return (
         <div className="bg-[#0D111C] text-[#E2E8F0] min-h-screen font-sans selection:bg-red-600/30 selection:text-white antialiased scroll-smooth">
-
-            {/* NAVBAR SUPERIOR MINIMALISTA 
-            <nav className="border-b border-slate-800/60 bg-[#0D111C]/80 backdrop-blur-md sticky top-0 z-50 transition-all">
-                <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-                    {/* LOGO RECAP DANCE 
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                        <div className="flex flex-col leading-none">
-                            <span
-                                className="text-lg font-black text-white uppercase"
-                                style={{ fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: '0.18em' }}
-                            >
-                                RECAP
-                            </span>
-                            <span
-                                className="text-[10px] font-semibold text-red-500 uppercase"
-                                style={{ fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: '0.22em' }}
-                            >
-                                DANCE
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
-                        <a href="#" className="text-white hover:text-red-400 transition-colors">Inicio</a>
-                        <a href="#eventos" className="hover:text-white hover:text-red-400 transition-colors">Eventos</a>
-                        <a href="#quienes-somos" className="hover:text-white hover:text-red-400 transition-colors">Quiénes Somos</a>
-                    </div>
-
-                    {/* BOTONES DE AUTENTICACIÓN 
-                    <div className="flex items-center gap-3">
-                        <button className="text-sm px-4 py-2 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all cursor-pointer font-medium">
-                            Iniciar sesión
-                        </button>
-                        <button className="text-sm px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-500 transition-colors font-semibold shadow-md shadow-red-600/10 cursor-pointer">
-                            Crear cuenta
-                        </button>
-                    </div>
-                </div>
-            </nav>*/}
-
             {/* 1. HERO SECTION */}
             <section className="relative min-h-[85vh] flex items-center justify-center px-6 overflow-hidden">
                 <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 rounded-full blur-[140px] pointer-events-none" />
@@ -226,7 +183,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToCatalog }) => {
                         {eventosFiltrados.map((evento) => (
                             <article
                                 key={evento.id}
-                                onClick={() => handleSelectEvento(evento.id)}
+                                onClick={() => handleSelectEvento(evento.slug)}
                                 className="group relative bg-[#131926]/40 border border-slate-800/80 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer hover:border-red-500/40 hover:-translate-y-1 hover:shadow-[0_8px_40px_rgba(220,38,38,0.15)] hover:bg-[#131926]/80"
                             >
                                 <div className="relative overflow-hidden h-52 bg-slate-900">

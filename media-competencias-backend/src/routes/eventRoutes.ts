@@ -5,7 +5,8 @@ import {
   getEventDetails,
   searchParticipants,
   getParticipantPackagesDetails,
-  getEventCategories
+  getEventCategories,
+  getEventoBySlug
 } from '../controllers/eventController';
 
 const router = Router();
@@ -16,6 +17,8 @@ router.get('/', getActiveEvents);
 // 2. Ruta principal del evento (LA QUE USA EVENTPAGE.TSX)
 // 🚨 Revisa que esta línea diga 'getEventWithParticipants'
 router.get('/:eventId', getEventWithParticipants);
+
+router.get('/slug/:slug', getEventoBySlug);
 
 // 3. Ruta para los paquetes (Si la necesitas para el checkout)
 router.get('/:eventId/paquetes', getEventDetails);

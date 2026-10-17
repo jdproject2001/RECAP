@@ -53,7 +53,10 @@ function initials(name: string) {
 }
 
 export default function PackagesPage() {
-  const { eventId, participantId } = useParams<{ eventId: string; participantId: string }>();
+  const { eventSlug, participantId } = useParams<{
+    eventSlug: string;
+    participantId: string;
+  }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { addToCart } = useCart(); // <-- Importamos la función del carrito
@@ -89,7 +92,7 @@ export default function PackagesPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`${API_BASE}/eventos/${eventId}/participantes/${participantId}`);
+        const res = await fetch(`${API_BASE}/eventos/slug/${eventSlug}/participantes/${participantId}`);
         if (!res.ok) throw new Error("No se pudo cargar la información del participante.");
 
         const data = await res.json();
@@ -104,10 +107,10 @@ export default function PackagesPage() {
       }
     };
 
-    if (eventId && participantId) {
+    if (eventSlug && participantId) {
       fetchDetails();
     }
-  }, [eventId, participantId]);
+  }, [eventSlug, participantId]);
 
   const paquetesFoto = useMemo(() => {
     return paquetesBD
@@ -322,7 +325,7 @@ export default function PackagesPage() {
     if (
       !activePackage ||
       !participante ||
-      !eventId ||
+      !eventSlug ||
       !participantId
     ) {
       return;
@@ -357,7 +360,7 @@ export default function PackagesPage() {
       if (hayMaterial) {
 
         navigate(
-          `/eventos/${eventId}/participantes/${participantId}/seleccionar-material`,
+          `/eventos/${evento?.id}/participantes/${participantId}/seleccionar-material`,
           {
             state: {
               paquete: {
@@ -488,7 +491,7 @@ export default function PackagesPage() {
         <div className="text-center space-y-4">
           <p className="text-lg text-slate-300 font-medium">{error || "No se encontró la información."}</p>
           <button
-            onClick={() => navigate(`/evento/${eventId}`)}
+            onClick={() => navigate(`/${eventSlug}`)}
             className="px-4 py-2 bg-red-600 text-white text-sm rounded-xl hover:bg-red-500 transition-colors cursor-pointer"
           >
             Volver al evento
@@ -505,7 +508,7 @@ export default function PackagesPage() {
       <div className="sticky top-20 z-40 bg-[#0D111C]/90 backdrop-blur-md border-b border-slate-800 px-6 py-3 transition-all">
         <div className="max-w-5xl mx-auto flex items-center">
           <button
-            onClick={() => navigate(`/evento/${eventId}`)}
+            onClick={() => navigate(`/${eventSlug}`)}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium cursor-pointer"
           >
             <ArrowLeft size={16} />
