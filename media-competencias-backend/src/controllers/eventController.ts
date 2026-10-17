@@ -281,8 +281,7 @@ export const getEventoBySlug = async (
         ON p.categoria_id = c.id
       WHERE c.evento_id = $1
       ORDER BY
-        c.nombre_categoria ASC,
-        p.dorsal_numero ASC
+  NULLIF(p.dorsal_numero, '')::integer ASC NULLS LAST
       `,
       [eventId]
     );
