@@ -10,6 +10,7 @@ import paymentRoutes from './routes/paymentRoutes';
 import participantRoutes from './routes/participantRoutes';
 import authRoutes from './routes/authRoutes';
 import multimediaRoutes from './routes/multimediaRoutes';
+import discountRoutes from './routes/discountRoutes';
 
 dotenv.config();
 
@@ -33,6 +34,8 @@ app.use('/api/v1', r2TestRoutes);*/
 app.use('/api/v1/multimedia', multimediaRoutes);
 
 app.use('/api/v1/pedidos', orderRoutes);
+
+app.use('/api/v1/descuentos', discountRoutes);
 
 app.use('/api/v1/payments', paymentRoutes);
 

@@ -8,7 +8,7 @@ export const createOrder = async (
   res: Response
 ): Promise<void> => {
 
-  const { nombre, email, whatsapp, items } = req.body;
+  const { nombre, email, whatsapp, items, codigo_descuento } = req.body;
 
   // =====================================================
   // 1. Validación básica
@@ -74,6 +74,10 @@ export const createOrder = async (
       participante_id: string;
       multimedia_ids: string[];
       tipo_compra: 'RESERVA' | 'DIRECTA';
+      evento_id: string;
+      academia: string | null;
+      paquete_tipo: string;
+      precio: number;
     }[] = [];
 
     for (const item of items) {
@@ -142,6 +146,7 @@ export const createOrder = async (
         `
         SELECT
           p.id,
+          p.academia,
           c.evento_id,
           c.tipo_categoria
         FROM participantes p
@@ -375,7 +380,7 @@ export const createOrder = async (
       // 3.9 Agregar precio real
       // -------------------------------------------------
 
-      const precioReal =  Number(paquete.precio);
+      const precioReal = Number(paquete.precio);
 
       if (
         !Number.isFinite(precioReal) ||
@@ -391,8 +396,141 @@ export const createOrder = async (
         paquete_id,
         participante_id,
         multimedia_ids: multimediaIdsUnicos,
-        tipo_compra
+        tipo_compra,
+        evento_id: paquete.evento_id,
+        academia: participante.academia || null,
+        paquete_tipo: paquete.tipo,
+        precio: precioReal
       });
+    }
+
+    // =====================================================
+    // 4. VALIDAR Y CALCULAR DESCUENTO
+    // =====================================================
+
+    const subtotal = montoTotal;
+    let descuentoMonto = 0;
+    let codigoDescuentoAplicado: string | null = null;
+
+    if (codigo_descuento && codigo_descuento.toString().trim() !== '') {
+      const codigoNormalizado = codigo_descuento?.toString().trim().toUpperCase() || codigo_descuento.toString().trim().toUpperCase();
+
+      // -----------------------------------------------------
+      // Buscar descuento
+      // -----------------------------------------------------
+      const descuentoResult = await client.query(
+        `
+    SELECT
+      id,
+      codigo,
+      evento_id,
+      academia,
+      tipo,
+      valor,
+      minimo_items,
+      tipo_paquete,
+      activo,
+      fecha_inicio,
+      fecha_fin
+    FROM descuentos
+    WHERE UPPER(codigo) = $1
+    LIMIT 1
+    `,
+        [codigoNormalizado]
+      );
+
+      if (descuentoResult.rows.length === 0) {
+        throw new Error('El código de descuento no existe.');
+      }
+
+      const descuento = descuentoResult.rows[0];
+
+      // -----------------------------------------------------
+      // Validar activo
+      // -----------------------------------------------------
+      if (!descuento.activo) {
+        throw new Error('El código de descuento no está activo.');
+      }
+
+      // -----------------------------------------------------
+      // Validar fechas
+      // -----------------------------------------------------
+      const ahora = new Date();
+
+      if (descuento.fecha_inicio && ahora < new Date(descuento.fecha_inicio)) {
+        throw new Error('El código de descuento todavía no está disponible.');
+      }
+
+      if (descuento.fecha_fin && ahora > new Date(descuento.fecha_fin)) {
+        throw new Error('El código de descuento ha expirado.');
+      }
+
+      // -----------------------------------------------------
+      // Validar mínimo de items
+      // -----------------------------------------------------
+      const minimoItems = Number(descuento.minimo_items || 1);
+
+      if (itemsProcesados.length < minimoItems) {
+        throw new Error(`Este descuento requiere al menos ${minimoItems} participantes.`);
+      }
+
+      // -----------------------------------------------------
+      // Validar cada item
+      // -----------------------------------------------------
+      for (const itemProcesado of itemsProcesados) {
+        // Evento
+        if (itemProcesado.evento_id !== descuento.evento_id) {
+          throw new Error('El código de descuento no corresponde a este evento.');
+        }
+
+        // Academia
+        if (descuento.academia) {
+          const academiaParticipante = itemProcesado.academia?.trim().toLowerCase();
+          const academiaDescuento = descuento.academia.trim().toLowerCase();
+
+          if (academiaParticipante !== academiaDescuento) {
+            throw new Error('El código de descuento solo es válido para la academia configurada.');
+          }
+        }
+
+        // Tipo de paquete
+        const tipoDescuento = descuento.tipo_paquete?.toString().trim().toUpperCase();
+        const tipoPaquete = itemProcesado.paquete_tipo?.toString().trim().toUpperCase();
+
+        if (tipoDescuento !== 'TODOS' && tipoDescuento !== tipoPaquete) {
+          throw new Error('El código de descuento no es válido para uno de los paquetes seleccionados.');
+        }
+      }
+
+      // -----------------------------------------------------
+      // Calcular descuento
+      // -----------------------------------------------------
+      const valorDescuento = Number(descuento.valor);
+
+      if (!Number.isFinite(valorDescuento) || valorDescuento < 0) {
+        throw new Error('El descuento tiene un valor inválido.');
+      }
+
+      if (descuento.tipo === 'PORCENTAJE') {
+        if (valorDescuento > 100) {
+          throw new Error('El porcentaje de descuento es inválido.');
+        }
+
+        descuentoMonto = subtotal * (valorDescuento / 100);
+      } else if (descuento.tipo === 'FIJO') {
+        descuentoMonto = valorDescuento;
+      } else {
+        throw new Error('El tipo de descuento es inválido.');
+      }
+
+      // Nunca descontar más que el subtotal
+      descuentoMonto = Math.min(descuentoMonto, subtotal);
+
+      // Redondear a centavos
+      descuentoMonto = Math.round(descuentoMonto * 100) / 100;
+
+      montoTotal = Math.round((subtotal - descuentoMonto) * 100) / 100;
+      codigoDescuentoAplicado = descuento.codigo;
     }
     // =====================================================
     // 4. Crear pedido
@@ -402,21 +540,33 @@ export const createOrder = async (
       `
       INSERT INTO pedidos (
         usuario_id,
+        subtotal,
+        descuento,
+        codigo_descuento,
         monto_total,
         estado_pago
       )
       VALUES (
         $1,
         $2,
+        $3,
+        $4,
+        $5,
         'pendiente'
       )
       RETURNING
         id,
+        subtotal,
+        descuento,
+        codigo_descuento,
         monto_total,
         estado_pago
       `,
       [
         usuarioId,
+        subtotal,
+        descuentoMonto,
+        codigoDescuentoAplicado,
         montoTotal
       ]
     );
@@ -492,7 +642,10 @@ export const createOrder = async (
       message: 'Pedido creado exitosamente en estado PENDIENTE.',
       pedido: {
         id: nuevoPedido.id,
-        monto_total: nuevoPedido.monto_total,
+        subtotal: Number(nuevoPedido.subtotal),
+        descuento: Number(nuevoPedido.descuento),
+        codigo_descuento: nuevoPedido.codigo_descuento,
+        monto_total: Number(nuevoPedido.monto_total),
         estado_pago: nuevoPedido.estado_pago
       }
     });
@@ -728,7 +881,7 @@ export const getMyPurchases = async (
 
           materialSuficiente =
             row.fotos_disponibles >=
-              Number(row.cantidad_fotos || 0) &&
+            Number(row.cantidad_fotos || 0) &&
             row.videos_disponibles >= 1;
         }
 

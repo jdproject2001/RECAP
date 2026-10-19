@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Search, Users, MapPin, Calendar, ChevronRight, ChevronDown, Building2 } from "lucide-react";
 import { API_BASE } from '../config/api';
+import Navbar from "../components/navbar";
 
 // Interfaces actualizadas al esquema relacional de la BD
 interface Evento {
@@ -178,31 +179,8 @@ export default function EventPage() {
   }
 
   return (
+
     <div className="min-h-screen bg-[#0B0F17] text-white">
-      {/* NAVBAR */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-[#0B0F17]/90 backdrop-blur-md border-b border-slate-800">
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium cursor-pointer"
-        >
-          <ArrowLeft size={16} />
-          <span>Volver</span>
-        </button>
-
-        <Link to="/" className="flex items-center gap-2">
-          <div className="flex flex-col leading-none">
-            <span className="text-base font-black tracking-widest text-white uppercase" style={{ fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: "0.18em" }}>
-              RECAP
-            </span>
-            <span className="text-[9px] font-semibold tracking-[0.22em] text-red-500 uppercase" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-              DANCE
-            </span>
-          </div>
-        </Link>
-
-        <div className="w-20" />
-      </nav>
-
       {/* EVENT HERO */}
       <div className="relative h-[220px] md:h-[260px] overflow-hidden bg-slate-900">
         <img
@@ -255,15 +233,16 @@ export default function EventPage() {
               <select
                 value={activeCategory}
                 onChange={(e) => setActiveCategory(e.target.value)}
-                className="appearance-none bg-[#0B0F17] border border-slate-800 text-slate-200 text-sm pl-3 pr-8 py-2 rounded-xl focus:outline-none focus:border-red-500/60 transition-colors cursor-pointer min-w-[260px] font-medium"
+                className="appearance-none w-full sm:w-auto bg-[#0B0F17] border border-slate-800 text-slate-200 text-sm pl-3 pr-10 py-2.5 rounded-xl focus:outline-none focus:border-red-500/60 transition-colors cursor-pointer sm:min-w-[260px] font-medium"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat} className="bg-[#0B0F17]">
-                    {cat === "Todos" ? "Categoría: Todas" : cat}
+                    {cat === "Todos" ? "Categoría: Todas" : cat.length > 42
+                      ? `${cat.slice(0, 42)}...`
+                      : cat}
                   </option>
                 ))}
               </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
         </div>
@@ -305,7 +284,7 @@ export default function EventPage() {
                       <td className="px-4 py-3.5 font-mono text-xs text-red-500 font-bold whitespace-nowrap">
                         #{participant.dorsal_numero || "S/N"}
                       </td>
-                      <td className="px-4 py-3.5 font-semibold text-white group-hover:text-red-500 transition-colors whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-semibold text-white group-hover:text-red-500 transition-colors whitespace-normal break-words">
                         {participant.nombre_completo}
                       </td>
                       <td className="px-4 py-3.5 text-slate-400 text-xs whitespace-nowrap">

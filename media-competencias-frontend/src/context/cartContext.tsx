@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 // 1. Definimos las interfaces según nuestro modelo de base de datos
 export interface Paquete {
@@ -38,12 +38,30 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 // 3. Proveedor del Contexto (El componente que envolverá la aplicación)
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const savedCart =
+        localStorage.getItem('recap_cart');
+
+      return savedCart
+        ? JSON.parse(savedCart)
+        : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      'recap_cart',
+      JSON.stringify(cart)
+    );
+  }, [cart]);
 
   // Añadir al carrito evitando duplicados exactos
   const addToCart = (paquete: Paquete, participante: Participante, multimedia_ids: string[], tipoCompra: TipoCompra) => {
     const idUnique = `${participante.id}-${paquete.id}`;
-    
+
     setCart((prevCart) => {
       const exists = prevCart.some((item) => item.idUnique === idUnique);
       if (exists) return prevCart; // Si ya existe el mismo paquete para el mismo participante, no hace nada
@@ -57,7 +75,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Vaciar el carrito
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+    localStorage.removeItem('recap_cart');
+  }
 
   // Calcular el total de la compra de forma dinámica en la interfaz
   const getCartTotal = () => {

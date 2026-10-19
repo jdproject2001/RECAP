@@ -453,13 +453,6 @@ export default function PackagesPage() {
     void procesarPaquete(accion);
   };
 
-  // ------------------------------------
-  /*
-    const proceedToCheckout = () => {
-      navigate('/carrito');
-    };*/
-  // ------------------------------------
-
   const avatarColor = AVATAR_COLORS[Math.abs((participante?.nombre_completo || "").length) % AVATAR_COLORS.length];
 
   const renderTipoBadge = (tipo?: string) => {

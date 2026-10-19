@@ -1,31 +1,19 @@
-import React, {
-  useEffect,
-  useRef,
-  useState
-} from 'react';
-import {
-  useNavigate,
-  useSearchParams
-} from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth } from '../firebase/firebase';
 import { API_BASE } from '../config/api';
+import { useCart } from '../context/cartContext';
 
 export const PaymentResult: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
-  const [loading, setLoading] =
-    useState(true);
-  const [estadoPago, setEstadoPago] =
-    useState<string | null>(null);
-  const [pedidoId, setPedidoId] =
-    useState<string | null>(null);
-  const [error, setError] =
-    useState<string | null>(null);
-
-  const confirmadoRef =
-    useRef(false);
-
+  const [loading, setLoading] = useState(true);
+  const [estadoPago, setEstadoPago] = useState<string | null>(null);
+  const [pedidoId, setPedidoId] =  useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const confirmadoRef =  useRef(false);
+  const { clearCart } = useCart();
+  
   useEffect(() => {
     if (confirmadoRef.current) {
       return;
@@ -96,6 +84,7 @@ export const PaymentResult: React.FC = () => {
         // REDIRECCIÓN AUTOMÁTICA SI FUE APROBADO
         // =========================================
         if (data.estadoPago === 'aprobado') {
+          clearCart();
           navigate('/mis-compras', { replace: true });
           return;
         }

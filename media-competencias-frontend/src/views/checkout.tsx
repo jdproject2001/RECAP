@@ -31,6 +31,17 @@ export const Checkout: React.FC<{
   const [payphoneConfig, setPayphoneConfig] = useState<PayphoneConfig | null>(null);
   const [paymentBoxError, setPaymentBoxError] = useState<string | null>(null);
   const [payphoneAssetsReady, setPayphoneAssetsReady] = useState(false);
+  const [codigoDescuento, setCodigoDescuento] = useState('');
+  const [validandoDescuento, setValidandoDescuento] = useState(false);
+  const [descuentoError, setDescuentoError] = useState<string | null>(null);
+  const [descuentoAplicado, setDescuentoAplicado] = useState<{
+    codigo: string;
+    tipo: string;
+    valor: number;
+    subtotal: number;
+    descuento: number;
+    total: number;
+  } | null>(null);
   // =====================================================
   // REFS DE CONTROL
   // =====================================================
@@ -124,6 +135,59 @@ export const Checkout: React.FC<{
     };
   }, []);
 
+  const aplicarDescuento = async () => {
+    if (!codigoDescuento.trim()) {
+      setDescuentoError('Ingresa un código de descuento.');
+      return;
+    }
+
+    setValidandoDescuento(true);
+    setDescuentoError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/descuentos/validar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          codigo: codigoDescuento.trim(),
+          items: cart.map(item => ({
+            paquete_id: item.paquete.id,
+            participante_id: item.participante.id
+          }))
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || 'El código de descuento no es válido.'
+        );
+      }
+
+      setDescuentoAplicado({
+        codigo: data.codigo,
+        tipo: data.tipo,
+        valor: Number(data.valor),
+        subtotal: Number(data.subtotal),
+        descuento: Number(data.descuento),
+        total: Number(data.total)
+      });
+
+      setCodigoDescuento(data.codigo);
+    } catch (err) {
+      setDescuentoAplicado(null);
+      setDescuentoError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo validar el código.'
+      );
+    } finally {
+      setValidandoDescuento(false);
+    }
+  };
   // =====================================================
   // CREAR PEDIDO + PREPARAR PAYPHONE
   // =====================================================
@@ -152,11 +216,10 @@ export const Checkout: React.FC<{
       // =================================================
       if (!pedidoId) {
         const orderPayload = {
-          nombre:
-            user.displayName || '',
-          email:
-            user.email || '',
+          nombre: user.displayName || '',
+          email: user.email || '',
           whatsapp: '',
+          codigo_descuento: descuentoAplicado ? descuentoAplicado.codigo : null,
           items:
             cart.map(item => ({
               paquete_id:
@@ -529,12 +592,104 @@ export const Checkout: React.FC<{
             </div>
 
             <div className="border-t border-slate-200 pt-5 mt-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Código de descuento
+              </p>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={codigoDescuento}
+                  onChange={(e) => {
+                    setCodigoDescuento(
+                      e.target.value.toUpperCase()
+                    );
+                    setDescuentoError(null);
+                  }}
+                  disabled={
+                    !!descuentoAplicado
+                  }
+                  placeholder="Ingresa tu código"
+                  className="flex-1 border border-slate-200 rounded-lg px-3 py-2.5 text-sm uppercase focus:outline-none focus:border-indigo-500 disabled:bg-slate-100"
+                />
+
+                {!descuentoAplicado ? (
+                  <button
+                    type="button"
+                    onClick={aplicarDescuento}
+                    disabled={
+                      validandoDescuento
+                    }
+                    className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white px-4 rounded-lg text-sm font-bold cursor-pointer"
+                  >
+                    {validandoDescuento
+                      ? 'Validando...'
+                      : 'Aplicar'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDescuentoAplicado(null);
+                      setCodigoDescuento('');
+                      setDescuentoError(null);
+                    }}
+                    className="border border-red-200 text-red-600 hover:bg-red-50 px-4 rounded-lg text-sm font-bold cursor-pointer"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+
+              {descuentoError && (
+                <p className="text-xs text-red-600 font-medium mt-2">
+                  {descuentoError}
+                </p>
+              )}
+
+              {descuentoAplicado && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
+                  <p className="text-xs font-bold text-green-700">
+                    ✓ Código {descuentoAplicado.codigo} aplicado
+                  </p>
+
+                  <p className="text-xs text-green-600 mt-1">
+                    Ahorras $
+                    {descuentoAplicado.descuento.toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 pt-5 mt-6">
+              {descuentoAplicado && (
+                <>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-slate-500">
+                      Subtotal
+                    </span>
+                    <span className="text-sm font-bold text-slate-700">
+                      ${descuentoAplicado.subtotal.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-bold text-green-600">
+                      Descuento {descuentoAplicado.codigo}
+                    </span>
+                    <span className="text-sm font-bold text-green-600">
+                      -${descuentoAplicado.descuento.toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-between items-center">
-                <span className="font-black text-slate-900">Total:</span>
-                <span className="text-2xl font-black text-indigo-600">$
-                  {getCartTotal()
-                    .toFixed(2)}{' '}
-                  USD
+                <span className="font-black text-slate-900">
+                  Total:
+                </span>
+                <span className="text-2xl font-black text-indigo-600">
+                  ${(descuentoAplicado ? descuentoAplicado.total : getCartTotal()).toFixed(2)} USD
                 </span>
               </div>
             </div>
@@ -564,7 +719,7 @@ export const Checkout: React.FC<{
                   onClick={prepararCheckout}
                   className="w-full text-white font-bold py-4 px-4 rounded-xl transition-colors text-sm bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
                 >
-                  Continuar al pago ${getCartTotal().toFixed(2)}
+                  Continuar al pago ${(descuentoAplicado ? descuentoAplicado.total : getCartTotal()).toFixed(2)}
                 </button>
               </div>
             )}

@@ -247,7 +247,7 @@ export default function MediaSelectionPage() {
       'DIRECTA'
     );
 
-    navigate('/carrito');
+    navigate(-2);
     return;
   }
 
