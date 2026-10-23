@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Search, Users, MapPin, Calendar, ChevronRight, ChevronDown, Building2 } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Search, Users, MapPin, Calendar, ChevronRight, Building2 } from "lucide-react";
 import { API_BASE } from '../config/api';
-import Navbar from "../components/navbar";
 
 // Interfaces actualizadas al esquema relacional de la BD
 interface Evento {

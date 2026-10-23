@@ -126,64 +126,117 @@ export default function MisComprasPage() {
     navigate(`/mis-compras/${item.pedido_item_id}/archivos`);
   };
 
-  const renderEstado = (item: PedidoItem) => {
-    if (item.estado_material === 'PAGO_PENDIENTE') {
-      return (
-        <div className="flex items-center gap-2 text-amber-400 text-sm font-bold">
-          <Clock3 size={17} />
+  const renderEstado = (
+  item: PedidoItem,
+  pedido: Pedido
+) => {
+
+  if (
+    pedido.estado_pago
+      ?.toLowerCase() === 'pendiente'
+  ) {
+    return (
+      <div className="flex flex-col gap-3">
+
+        <div
+          className="
+            border border-amber-500/20
+            bg-amber-500/5
+            rounded-2xl
+            px-5 py-4
+            text-amber-400
+            font-bold
+          "
+        >
           Pago pendiente
         </div>
-      );
-    }
 
-    if (item.estado_material === 'MATERIAL_PENDIENTE') {
-      return (
-        <div>
-          <div className="flex items-center gap-2 text-slate-300 text-sm font-bold">
-            <Clock3 size={17} />
-            Material pendiente
-          </div>
-          <p className="text-xs text-slate-500 mt-2">
-            Estamos preparando tu material. Cuando esté disponible podrás seleccionarlo desde aquí.
-          </p>
+        <button
+          type="button"
+          onClick={() =>
+            navigate(
+              `/pago/reintentar/${pedido.id}`
+            )
+          }
+          className="
+            bg-red-600
+            hover:bg-red-500
+            text-white
+            font-bold
+            px-5 py-3
+            rounded-xl
+            transition-colors
+            cursor-pointer
+          "
+        >
+          Reintentar pago
+        </button>
+
+      </div>
+    );
+  }
+
+  if (
+    item.estado_material ===
+    'MATERIAL_PENDIENTE'
+  ) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 text-slate-300 text-sm font-bold">
+          <Clock3 size={17} />
+          Material pendiente
         </div>
-      );
-    }
 
-    if (item.estado_material === 'DISPONIBLE_PARA_SELECCIONAR') {
-      return (
-        <div>
-          <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold">
-            <CheckCircle2 size={17} />
-            Material disponible
-          </div>
-          <button
-            type="button"
-            onClick={() => handleSeleccionarMaterial(item)}
-            className="mt-3 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
-          >
-            Seleccionar material
-          </button>
-        </div>
-      );
-    }
+        <p className="text-xs text-slate-500 mt-2">
+          Estamos preparando tu material. Cuando esté disponible podrás seleccionarlo desde aquí.
+        </p>
+      </div>
+    );
+  }
 
+  if (
+    item.estado_material ===
+    'DISPONIBLE_PARA_SELECCIONAR'
+  ) {
     return (
       <div>
         <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold">
           <CheckCircle2 size={17} />
-          Material seleccionado
+          Material disponible
         </div>
+
         <button
           type="button"
-          onClick={() => handleVerArchivos(item)}
-          className="mt-3 bg-[#1A1F2E] border border-slate-700 hover:border-slate-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+          onClick={() =>
+            handleSeleccionarMaterial(item)
+          }
+          className="mt-3 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
         >
-          Ver mis archivos
+          Seleccionar material
         </button>
       </div>
     );
-  };
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold">
+        <CheckCircle2 size={17} />
+        Material seleccionado
+      </div>
+
+      <button
+        type="button"
+        onClick={() =>
+          handleVerArchivos(item)
+        }
+        className="mt-3 bg-[#1A1F2E] border border-slate-700 hover:border-slate-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+      >
+        Ver mis archivos
+      </button>
+    </div>
+  );
+};
 
   if (loading) {
     return (
@@ -303,7 +356,7 @@ export default function MisComprasPage() {
                         </div>
 
                         <div className="lg:w-64 bg-[#0D111C] border border-slate-800 rounded-xl p-4">
-                          {renderEstado(item)}
+                          {renderEstado(item, pedido)}
                         </div>
                       </div>
                     </div>

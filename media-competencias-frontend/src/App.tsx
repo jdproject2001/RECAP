@@ -14,6 +14,7 @@ import MediaSelectionPage from './views/mediaSelectionPage';
 import AdminMediaPage from './views/adminMediaPage';
 import MisComprasPage from './views/misComprasPage';
 import MisArchivosPage from './views/misArchivosPage';
+import RetryPaymentPage from './views/RetryPaymentPage';
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ function AppRoutes() {
             path="/checkout" 
             element={<Checkout onBackToCatalog={() => navigate('/')} />} 
           />
+          <Route path="/pago/reintentar/:pedidoId" element={<RetryPaymentPage />}/>
 
           {/*MIS COMPRAS */}
           <Route path="/mis-compras" element={<MisComprasPage />}/>
