@@ -62,17 +62,25 @@ export const generateDownloadUrl = async (
   expiresInSeconds = 300,
   fileName?: string
 ): Promise<string> => {
+
+  const safeFileName = fileName?.replace(/["\r\n]/g, '_');
+  const encodedFileName = safeFileName? encodeURIComponent(safeFileName): null;
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: key,
-    ResponseContentDisposition: fileName
-      ? `attachment; filename="${fileName}"`
-      : 'attachment'
+    ResponseContentDisposition:
+      safeFileName && encodedFileName
+        ? `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`
+        : 'attachment'
   });
 
-  return await getSignedUrl(r2Client, command, {
-    expiresIn: expiresInSeconds
-  });
+  return await getSignedUrl(
+    r2Client,
+    command,
+    {
+      expiresIn: expiresInSeconds
+    }
+  );
 };
 
 

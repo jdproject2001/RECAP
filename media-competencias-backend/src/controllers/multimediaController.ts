@@ -725,9 +725,13 @@ export const getMultimediaDownloadUrl = async (
       return;
     }
 
+    const expiresIn = multimedia.tipo === 'VIDEO'
+        ? 3600
+        : 600;
+
     const downloadUrl = await generateDownloadUrl(
       multimedia.r2_original_key,
-      300,
+      expiresIn,
       multimedia.nombre_archivo
     );
 
@@ -736,7 +740,7 @@ export const getMultimediaDownloadUrl = async (
       nombreArchivo: multimedia.nombre_archivo,
       tipo: multimedia.tipo,
       downloadUrl,
-      expiresIn: 300
+      expiresIn
     });
   } catch (error) {
     console.error('Error generando URL de descarga:', error);

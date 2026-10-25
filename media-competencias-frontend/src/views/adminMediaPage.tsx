@@ -30,6 +30,7 @@ interface UploadItem {
     | 'COMPLETADO'
     | 'ERROR';
     error?: string;
+    progreso?: number;
 }
 
 export default function AdminMediaPage() {
@@ -45,7 +46,7 @@ export default function AdminMediaPage() {
     const [subiendoVideo, setSubiendoVideo] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [busquedaParticipante, setBusquedaParticipante] = useState('');
-    const [categoriaSeleccionada, setCategoriaSeleccionada] =useState('');
+    const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('');
 
     // ======================================================
     // CARGAR EVENTOS
@@ -85,13 +86,13 @@ export default function AdminMediaPage() {
         const mapa = new Map<string, string>();
         participantes.forEach((p) => {
             if (
-            p.categoria_id &&
-            p.nombre_categoria
-            ) {
-            mapa.set(
-                p.categoria_id,
+                p.categoria_id &&
                 p.nombre_categoria
-            );
+            ) {
+                mapa.set(
+                    p.categoria_id,
+                    p.nombre_categoria
+                );
             }
         });
 
@@ -102,7 +103,7 @@ export default function AdminMediaPage() {
             nombre
         }));
 
-        }, [participantes]
+    }, [participantes]
     );
 
     const participantesFiltrados = useMemo(() => {
@@ -125,11 +126,11 @@ export default function AdminMediaPage() {
                 academia.includes(texto)
             );
         });
-        }, [
-            participantes,
-            busquedaParticipante,
-            categoriaSeleccionada
-        ]
+    }, [
+        participantes,
+        busquedaParticipante,
+        categoriaSeleccionada
+    ]
     );
 
     useEffect(() => {
@@ -297,33 +298,159 @@ export default function AdminMediaPage() {
         // ------------------------------------------
         // 2. SUBIR DIRECTAMENTE A R2
         // ------------------------------------------
+        /*
+                const r2Response = await fetch(
+                    uploadUrl,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type':
+                                item.file.type ||
+                                'application/octet-stream'
+                        },
+                        body: item.file
+                    }
+                );
+                
+                if (!r2Response.ok) {
+                    const responseText =
+                        await r2Response.text();
+        
+                    console.error('ERROR R2:', responseText);
+                    throw new Error(
+                        'No se pudo subir el archivo a Cloudflare R2.'
+                    );
+                }
+        
+        */
 
-        const r2Response = await fetch(
-            uploadUrl,
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type':
-                        item.file.type ||
+        const subirAR2ConProgreso = (
+            uploadUrl: string,
+            file: File,
+            onProgress?: (porcentaje: number) => void
+        ): Promise<void> => {
+            return new Promise(
+                (resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+
+                    xhr.open(
+                        'PUT',
+                        uploadUrl,
+                        true
+                    );
+
+                    xhr.setRequestHeader(
+                        'Content-Type',
+                        file.type ||
                         'application/octet-stream'
-                },
-                body: item.file
+                    );
+
+                    xhr.upload.onprogress =
+                        (event) => {
+                            if (
+                                !event.lengthComputable
+                            ) {
+                                return;
+                            }
+
+                            const porcentaje =
+                                Math.round(
+                                    (
+                                        event.loaded /
+                                        event.total
+                                    ) *
+                                    100
+                                );
+
+                            onProgress?.(
+                                porcentaje
+                            );
+                        };
+
+                    xhr.onload = () => {
+                        if (
+                            xhr.status >= 200 &&
+                            xhr.status < 300
+                        ) {
+                            resolve();
+                            return;
+                        }
+
+                        reject(
+                            new Error(
+                                `Error subiendo a R2. Status: ${xhr.status}`
+                            )
+                        );
+                    };
+
+                    xhr.onerror = () => {
+                        reject(
+                            new Error(
+                                'Error de red durante la subida a R2.'
+                            )
+                        );
+                    };
+
+                    xhr.send(file);
+                }
+            );
+        };
+
+        console.time(`UPLOAD_R2_${item.file.name}`);
+
+        await subirAR2ConProgreso(
+            uploadUrl,
+            item.file,
+            (porcentaje) => {
+
+                if (tipo === 'foto') {
+                    actualizarFoto(
+                        item.id,
+                        {
+                            status: 'SUBIENDO',
+                            progreso: porcentaje
+                        }
+                    );
+                } else {
+                    setVideo((prev) =>
+                        prev
+                            ? {
+                                ...prev,
+                                status: 'SUBIENDO',
+                                progreso: porcentaje
+                            }
+                            : null
+                    );
+                }
             }
         );
 
-        if (!r2Response.ok) {
-            const responseText =
-                await r2Response.text();
-
-            console.error('ERROR R2:', responseText);
-            throw new Error(
-                'No se pudo subir el archivo a Cloudflare R2.'
-            );
-        }
+        console.timeEnd(`UPLOAD_R2_${item.file.name}`);
 
         // ------------------------------------------
         // 3. CONFIRMAR EN BACKEND
         // ------------------------------------------
+        if (tipo === 'foto') {
+            actualizarFoto(
+                item.id,
+                {
+                    status: 'CONFIRMANDO',
+                    progreso: 100
+                }
+            );
+        } else {
+            setVideo((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        status: 'CONFIRMANDO',
+                        progreso: 100
+                    }
+                    : null
+            );
+        }
+
+        console.time(`CONFIRM_BACKEND_${item.file.name}`);
 
         const confirmResponse = await fetch(
             `${API_BASE}/multimedia/confirm-upload`,
@@ -342,6 +469,8 @@ export default function AdminMediaPage() {
                 })
             }
         );
+
+        console.timeEnd(`CONFIRM_BACKEND_${item.file.name}`);
 
         const confirmData =
             await confirmResponse.json();
@@ -521,91 +650,90 @@ export default function AdminMediaPage() {
                             <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Buscar participante</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                                 <select
-                                value={categoriaSeleccionada}
-                                onChange={(e) => {
-                                    setCategoriaSeleccionada(
-                                    e.target.value
-                                    );
-                                    setParticipanteId('');
-                                }}
-                                disabled={!eventoId}
-                                className="bg-[#181A24] border border-slate-700 rounded-xl p-3 text-sm text-white"
+                                    value={categoriaSeleccionada}
+                                    onChange={(e) => {
+                                        setCategoriaSeleccionada(
+                                            e.target.value
+                                        );
+                                        setParticipanteId('');
+                                    }}
+                                    disabled={!eventoId}
+                                    className="bg-[#181A24] border border-slate-700 rounded-xl p-3 text-sm text-white"
                                 >
-                                <option value="">Todas las categorías</option>
-                                {categoriasDisponibles.map(
-                                    (categoria) => (
-                                    <option
-                                        key={categoria.id}
-                                        value={categoria.id}
-                                    >
-                                        {categoria.nombre}
-                                    </option>
-                                    )
-                                )}
+                                    <option value="">Todas las categorías</option>
+                                    {categoriasDisponibles.map(
+                                        (categoria) => (
+                                            <option
+                                                key={categoria.id}
+                                                value={categoria.id}
+                                            >
+                                                {categoria.nombre}
+                                            </option>
+                                        )
+                                    )}
                                 </select>
                                 <input
-                                type="text"
-                                value={busquedaParticipante}
-                                onChange={(e) =>
-                                    setBusquedaParticipante(
-                                    e.target.value
-                                    )
-                                }
-                                disabled={!eventoId}
-                                placeholder="Nombre, dorsal o academia..."
-                                className="md:col-span-2 bg-[#181A24] border border-slate-700 rounded-xl p-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
+                                    type="text"
+                                    value={busquedaParticipante}
+                                    onChange={(e) =>
+                                        setBusquedaParticipante(
+                                            e.target.value
+                                        )
+                                    }
+                                    disabled={!eventoId}
+                                    placeholder="Nombre, dorsal o academia..."
+                                    className="md:col-span-2 bg-[#181A24] border border-slate-700 rounded-xl p-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
                                 />
                             </div>
                             {eventoId && (
                                 <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                                {participantesFiltrados.length === 0 ? (
-                                    <div className="text-center text-slate-500 py-8 bg-[#181A24] rounded-xl">No se encontraron participantes.</div>
-                                ) : (
-                                    participantesFiltrados.map(
-                                    (participante) => {
-                                        const seleccionado = participante.id === participanteId;
-                                        return (
-                                        <button
-                                            key={participante.id}
-                                            type="button"
-                                            onClick={() => {
-                                            setParticipanteId(
-                                                participante.id
-                                            );
+                                    {participantesFiltrados.length === 0 ? (
+                                        <div className="text-center text-slate-500 py-8 bg-[#181A24] rounded-xl">No se encontraron participantes.</div>
+                                    ) : (
+                                        participantesFiltrados.map(
+                                            (participante) => {
+                                                const seleccionado = participante.id === participanteId;
+                                                return (
+                                                    <button
+                                                        key={participante.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setParticipanteId(
+                                                                participante.id
+                                                            );
 
-                                            setFotos([]);
-                                            setVideo(null);
-                                            }}
-                                            className={`w-full text-left p-4 rounded-xl border transition-colors ${
-                                            seleccionado
-                                                ? 'border-red-500 bg-red-500/10'
-                                                : 'border-slate-800 bg-[#181A24] hover:border-slate-600'
-                                            }`}
-                                        >
-                                            <div className="flex justify-between gap-4">
-                                            <div>
-                                                <p className="font-bold text-white">
-                                                {participante.nombre_completo}
-                                                </p>
-                                                <p className="text-xs text-slate-400 mt-1">
-                                                {participante.nombre_categoria || 'Sin categoría'}
-                                                {participante.academia &&
-                                                    ` · ${participante.academia}`}
-                                                </p>
-                                            </div>
-                                            <span className="font-mono text-red-400 text-sm">
-                                                #{participante.dorsal_numero || 'S/N'}
-                                            </span>
+                                                            setFotos([]);
+                                                            setVideo(null);
+                                                        }}
+                                                        className={`w-full text-left p-4 rounded-xl border transition-colors ${seleccionado
+                                                            ? 'border-red-500 bg-red-500/10'
+                                                            : 'border-slate-800 bg-[#181A24] hover:border-slate-600'
+                                                            }`}
+                                                    >
+                                                        <div className="flex justify-between gap-4">
+                                                            <div>
+                                                                <p className="font-bold text-white">
+                                                                    {participante.nombre_completo}
+                                                                </p>
+                                                                <p className="text-xs text-slate-400 mt-1">
+                                                                    {participante.nombre_categoria || 'Sin categoría'}
+                                                                    {participante.academia &&
+                                                                        ` · ${participante.academia}`}
+                                                                </p>
+                                                            </div>
+                                                            <span className="font-mono text-red-400 text-sm">
+                                                                #{participante.dorsal_numero || 'S/N'}
+                                                            </span>
 
-                                            </div>
-                                        </button>
-                                        );
-                                    }
-                                    )
-                                )}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            }
+                                        )
+                                    )}
                                 </div>
                             )}
-                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -650,11 +778,11 @@ export default function AdminMediaPage() {
                                         <div className="shrink-0 flex items-center gap-3">
                                             {item.status === 'PENDIENTE' && (
                                                 <button
-                                                type="button"  onClick={() => eliminarFoto(item.id)}
-                                                className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
-                                                title="Quitar archivo"
+                                                    type="button" onClick={() => eliminarFoto(item.id)}
+                                                    className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                                                    title="Quitar archivo"
                                                 >
-                                                <X size={16} />
+                                                    <X size={16} />
                                                 </button>
                                             )}
 
@@ -664,21 +792,21 @@ export default function AdminMediaPage() {
 
                                             {(item.status === 'SUBIENDO' ||
                                                 item.status === 'CONFIRMANDO') && (
-                                                <Loader2 size={18} className="animate-spin text-amber-400"/>
-                                            )}
+                                                    <Loader2 size={18} className="animate-spin text-amber-400" />
+                                                )}
 
                                             {item.status === 'COMPLETADO' && (
-                                                <CheckCircle2 size={19} className="text-emerald-500"/>
+                                                <CheckCircle2 size={19} className="text-emerald-500" />
                                             )}
 
                                             {item.status === 'ERROR' && (
                                                 <>
-                                                <button type="button" onClick={() => eliminarFoto(item.id)}
-                                                    className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-red-500"
-                                                >
-                                                    <X size={16} />
-                                                </button>
-                                                <XCircle size={19} className="text-red-500"/>
+                                                    <button type="button" onClick={() => eliminarFoto(item.id)}
+                                                        className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-red-500"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                    <XCircle size={19} className="text-red-500" />
                                                 </>
                                             )}
                                         </div>
@@ -689,19 +817,18 @@ export default function AdminMediaPage() {
                                 type="button"
                                 onClick={handleSubirFotos}
                                 disabled={subiendoFotos || !participanteId || todasLasFotosCompletadas}
-                                className={`mt-5 w-full py-3.5 rounded-xl font-bold uppercase transition-colors ${
-                                    todasLasFotosCompletadas
-                                    ? 'bg-emerald-600 text-white cursor-default' : 
+                                className={`mt-5 w-full py-3.5 rounded-xl font-bold uppercase transition-colors ${todasLasFotosCompletadas
+                                    ? 'bg-emerald-600 text-white cursor-default' :
                                     subiendoFotos || !participanteId
                                         ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                                         : 'bg-red-600 hover:bg-red-500 text-white cursor-pointer'
                                     }`}
                             >
                                 {todasLasFotosCompletadas
-                                ? `✓ ${fotos.length} fotografías subidas`
-                                : subiendoFotos
-                                    ? `Subiendo ${fotosCompletadas}/${fotos.length}...`
-                                    : `Subir ${fotos.length} fotografías`}
+                                    ? `✓ ${fotos.length} fotografías subidas`
+                                    : subiendoFotos
+                                        ? `Subiendo ${fotosCompletadas}/${fotos.length}...`
+                                        : `Subir ${fotos.length} fotografías`}
                             </button>
                             {fotosError > 0 && (
                                 <p className="text-xs text-red-400 mt-3 text-center">
@@ -752,8 +879,35 @@ export default function AdminMediaPage() {
                                     <XCircle className="text-red-500" />
                                 )}
 
-                                {video.status === 'SUBIENDO' && (
-                                    <Loader2 className="animate-spin text-amber-400" />
+                                {(video.status === 'SUBIENDO' || video.status === 'CONFIRMANDO') && (
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-right">
+                                            {video.status === 'SUBIENDO' ? (
+                                                <>
+                                                    <p className="text-sm font-bold text-amber-400">
+                                                        {video.progreso || 0}%
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-500">
+                                                        Subiendo
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="text-xs font-bold text-blue-400">
+                                                        Confirmando
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-500">
+                                                        100%
+                                                    </p>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <Loader2
+                                            className="animate-spin text-amber-400"
+                                            size={20}
+                                        />
+                                    </div>
                                 )}
                             </div>
                             <button type="button" onClick={handleSubirVideo}
@@ -764,8 +918,32 @@ export default function AdminMediaPage() {
                                     ? 'Subiendo video...'
                                     : 'Subir video'}
                             </button>
+                            {(video.status === 'SUBIENDO' || video.status === 'CONFIRMANDO') && (
+                                <div className="mt-3">
+                                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-red-500 transition-all duration-200"
+                                            style={{
+                                                width: `${video.progreso || 0}%`
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-between mt-2 text-[11px] text-slate-500">
+                                        <span>
+                                            {video.status === 'CONFIRMANDO'
+                                                ? 'Confirmando archivo...'
+                                                : 'Subiendo a Cloudflare R2...'}
+                                        </span>
+                                        <span>
+                                            {video.progreso || 0}%
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
+
                 </div>
             </div>
         </div>

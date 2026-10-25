@@ -133,7 +133,6 @@ export default function MisArchivosPage() {
       }
 
       const token = await user.getIdToken();
-
       const response = await fetch(
         `${API_BASE}/multimedia/${archivo.id}/download`,
         {
@@ -156,14 +155,7 @@ export default function MisArchivosPage() {
       }
 
       // Forzar la descarga mediante la creación temporal de un elemento <a>
-      const anchor = document.createElement('a');
-      anchor.href = responseData.downloadUrl;
-      anchor.download = archivo.nombre_archivo || 'descarga';
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
+      window.location.assign(responseData.downloadUrl);
     } catch (err) {
       console.error('Error descargando archivo:', err);
       setError(
