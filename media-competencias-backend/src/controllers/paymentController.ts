@@ -372,7 +372,7 @@ export const confirmPayment = async (
 
     let nuevoEstado:
       | 'aprobado'
-      | 'rechazado'
+      | 'fallido'
       | 'pendiente';
 
     if (
@@ -385,7 +385,7 @@ export const confirmPayment = async (
       transactionStatus === 'canceled' ||
       transactionStatus === 'cancelled'
     ) {
-      nuevoEstado = 'rechazado';
+      nuevoEstado = 'fallido';
     } else {
       nuevoEstado = 'pendiente';
     }
