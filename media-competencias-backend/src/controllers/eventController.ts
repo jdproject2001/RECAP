@@ -5,7 +5,7 @@ import { query } from '../db'; // Ajusta la ruta a tu archivo db según correspo
 export const getActiveEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await query(
-      'SELECT id, nombre, fecha, lugar, slug, activo, imagen_url FROM eventos WHERE activo = true ORDER BY fecha ASC'
+      'SELECT id, nombre, fecha, lugar, slug, activo, imagen_url FROM eventos WHERE activo = true ORDER BY fecha desc'
     );
     res.json(result.rows);
   } catch (error) {

@@ -11,6 +11,7 @@ import participantRoutes from './routes/participantRoutes';
 import authRoutes from './routes/authRoutes';
 import multimediaRoutes from './routes/multimediaRoutes';
 import discountRoutes from './routes/discountRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use('/api/v1/descuentos', discountRoutes);
 
 app.use('/api/v1/payments', paymentRoutes);
 
+app.use('/api/v1/dashboard', dashboardRoutes);
 // Endpoint de prueba de salud
 app.get('/health', async (req, res) => {
   try {

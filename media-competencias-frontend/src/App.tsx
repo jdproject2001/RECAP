@@ -15,6 +15,7 @@ import AdminMediaPage from './views/adminMediaPage';
 import MisComprasPage from './views/misComprasPage';
 import MisArchivosPage from './views/misArchivosPage';
 import RetryPaymentPage from './views/RetryPaymentPage';
+import AdminEventDashboardPage from './views/adminEventDashboardPage';
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -60,6 +61,8 @@ function AppRoutes() {
           <Route path="/mis-compras/:pedidoItemId/archivos" element={<MisArchivosPage />}/>
 
           <Route path="/pago/resultado" element={<PaymentResult />}/>
+
+          <Route path="/admin/dashboard" element={<AdminEventDashboardPage />}/>
           
           {/* 6. Redirección si la ruta no existe */}
           <Route path="*" element={<Navigate to="/" replace />} />

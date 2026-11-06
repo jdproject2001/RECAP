@@ -46,7 +46,7 @@ export default function MediaSelectionPage() {
     participantId?: string;
     pedidoItemId?: string;
   }>();
-  
+
   const { addToCart } = useCart();
   const state = location.state as LocationState | null;
   const paquete = state?.paquete;
@@ -126,12 +126,12 @@ export default function MediaSelectionPage() {
   );
 
   const videos = useMemo(() => multimedia.filter(
-      (item) =>
-        item.tipo === 'VIDEO' &&
-        item.activo
-    ),
-  [multimedia]
-);
+    (item) =>
+      item.tipo === 'VIDEO' &&
+      item.activo
+  ),
+    [multimedia]
+  );
 
   const fotosSeleccionadas = selectedIds.filter((id) =>
     fotos.some((foto) => foto.id === id)
@@ -216,92 +216,95 @@ export default function MediaSelectionPage() {
   };
 
   const handleConfirmarSeleccion = async () => {
-  if (!paquete || !participante) {
-    setError('No se encontró la información del paquete o participante.');
-    return;
-  }
-
-  if (!seleccionValida) {
-    setError('Debes completar la selección requerida por el paquete.');
-    return;
-  }
-
-  // =====================================================
-  // COMPRA DIRECTA
-  // =====================================================
-  if (!esReserva) {
-    addToCart(
-      {
-        id: paquete.id,
-        nombre_paquete: paquete.nombre_paquete,
-        descripcion: paquete.descripcion || '',
-        precio: Number(paquete.precio),
-        tipo: paquete.tipo
-      },
-      {
-        id: participante.id,
-        nombre_completo: participante.nombre_completo,
-        dorsal_numero: participante.dorsal_numero
-      },
-      selectedIds,
-      'DIRECTA'
-    );
-
-    navigate(-2);
-    return;
-  }
-
-  // =====================================================
-  // RESERVA YA PAGADA
-  // =====================================================
-  if (!pedidoItemId) {
-    setError('No se encontró el pedido asociado a esta reserva.');
-    return;
-  }
-
-  const firebaseUser = auth.currentUser;
-
-  if (!firebaseUser) {
-    setError('Debes iniciar sesión para completar tu reserva.');
-    return;
-  }
-
-  try {
-    setConfirmando(true);
-    setError(null);
-
-    const token = await firebaseUser.getIdToken();
-
-    const response = await fetch(
-      `${API_BASE}/pedidos/${pedidoItemId}/seleccionar-material`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          multimedia_ids: selectedIds
-        })
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'No se pudo guardar la selección.');
+    if (!paquete || !participante) {
+      setError('No se encontró la información del paquete o participante.');
+      return;
     }
 
-    navigate('/mis-compras', { replace: true });
-  } catch (err) {
-    console.error('Error confirmando selección:', err);
-    setError(
-      err instanceof Error ? err.message : 'No se pudo guardar la selección.'
-    );
-  } finally {
-    setConfirmando(false);
-  }
-};
+    if (!seleccionValida) {
+      setError('Debes completar la selección requerida por el paquete.');
+      return;
+    }
+
+    // =====================================================
+    // COMPRA DIRECTA
+    // =====================================================
+    if (!esReserva) {
+      addToCart(
+        {
+          id: paquete.id,
+          nombre_paquete: paquete.nombre_paquete,
+          descripcion: paquete.descripcion || '',
+          precio: Number(paquete.precio),
+          tipo: paquete.tipo
+        },
+        {
+          id: participante.id,
+          nombre_completo: participante.nombre_completo,
+          dorsal_numero: participante.dorsal_numero
+        },
+        selectedIds,
+        'DIRECTA'
+      );
+
+      navigate(-2);
+      return;
+    }
+
+    // =====================================================
+    // RESERVA YA PAGADA
+    // =====================================================
+    if (!pedidoItemId) {
+      setError('No se encontró el pedido asociado a esta reserva.');
+      return;
+    }
+
+    const firebaseUser = auth.currentUser;
+
+    if (!firebaseUser) {
+      setError('Debes iniciar sesión para completar tu reserva.');
+      return;
+    }
+
+    try {
+      setConfirmando(true);
+      setError(null);
+
+      const token = await firebaseUser.getIdToken();
+
+      const response = await fetch(
+        `${API_BASE}/pedidos/${pedidoItemId}/seleccionar-material`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            multimedia_ids: selectedIds
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo guardar la selección.');
+      }
+
+      navigate(
+        `/mis-compras/${pedidoItemId}/archivos`,
+        { replace: true }
+      );
+    } catch (err) {
+      console.error('Error confirmando selección:', err);
+      setError(
+        err instanceof Error ? err.message : 'No se pudo guardar la selección.'
+      );
+    } finally {
+      setConfirmando(false);
+    }
+  };
 
   if (!paquete || !participante) {
     return (
@@ -465,8 +468,8 @@ export default function MediaSelectionPage() {
                               toggleFoto(foto.id)
                             }
                             className={`relative overflow-hidden rounded-xl border-2 transition-all cursor-pointer aspect-[4/5] ${selected
-                                ? 'border-red-500'
-                                : 'border-slate-800 hover:border-slate-600'
+                              ? 'border-red-500'
+                              : 'border-slate-800 hover:border-slate-600'
                               }`}
                           >
                             {foto.previewUrl ? (
@@ -529,8 +532,8 @@ export default function MediaSelectionPage() {
                               toggleVideo(video.id)
                             }
                             className={`w-full flex items-center justify-between p-5 rounded-xl border transition-all cursor-pointer ${selected
-                                ? 'border-red-500 bg-red-500/10'
-                                : 'border-slate-800 bg-[#12131A] hover:border-slate-600'
+                              ? 'border-red-500 bg-red-500/10'
+                              : 'border-slate-800 bg-[#12131A] hover:border-slate-600'
                               }`}
                           >
                             <div className="flex items-center gap-4">
@@ -603,11 +606,10 @@ export default function MediaSelectionPage() {
                 type="button"
                 disabled={!seleccionValida || confirmando}
                 onClick={handleConfirmarSeleccion}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold uppercase transition-all ${
-                  seleccionValida && !confirmando
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold uppercase transition-all ${seleccionValida && !confirmando
                     ? 'bg-red-600 hover:bg-red-500 text-white cursor-pointer'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 {confirmando ? (
                   <>
