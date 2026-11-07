@@ -107,83 +107,137 @@ export const getEventDashboard = async (
     // =====================================================
     const dashboardResult = await client.query(
       `
+      WITH multimedia_resumen AS (
+        SELECT
+          participante_id,
+
+          COUNT(*) FILTER (
+            WHERE tipo = 'FOTO'
+              AND activo = TRUE
+          ) AS cantidad_fotos,
+
+          COUNT(*) FILTER (
+            WHERE tipo = 'VIDEO'
+              AND activo = TRUE
+          ) AS cantidad_videos,
+
+          STRING_AGG(
+            nombre_archivo,
+            ', '
+            ORDER BY fecha_creacion
+          ) FILTER (
+            WHERE tipo = 'VIDEO'
+              AND activo = TRUE
+          ) AS nombres_video,
+
+          MAX(fecha_creacion) FILTER (
+            WHERE tipo = 'VIDEO'
+              AND activo = TRUE
+          ) AS fecha_subida_video,
+
+          MAX(fecha_creacion) FILTER (
+            WHERE tipo = 'FOTO'
+              AND activo = TRUE
+          ) AS fecha_ultima_foto
+
+        FROM multimedia
+        GROUP BY participante_id
+      ),
+
+      pedidos_resumen AS (
+        SELECT
+          pi.participante_id,
+
+          BOOL_OR(
+            pe.estado_pago = 'aprobado'
+          ) AS tiene_pedido_pagado
+
+        FROM pedido_items pi
+
+        INNER JOIN pedidos pe
+          ON pe.id = pi.pedido_id
+
+        GROUP BY pi.participante_id
+      )
+
       SELECT
         p.id AS participante_id,
+
         c.id AS categoria_id,
         c.nombre_categoria,
         c.orden_categoria,
+
         p.nombre_completo AS participante,
         p.dorsal_numero AS orden,
         p.academia,
+
         -- =============================================
-        -- ESTADO DEL VIDEO
+        -- VIDEO
         -- =============================================
+
         CASE
-          WHEN COUNT(m.id) FILTER (
-            WHERE m.tipo = 'VIDEO'
-              AND m.activo = TRUE
-          ) > 0
+          WHEN COALESCE(mr.cantidad_videos, 0) > 0
           THEN 'SUBIDO'
           ELSE 'PENDIENTE'
         END AS estado_video,
-        -- =============================================
-        -- NOMBRE DEL ARCHIVO
-        -- =============================================
+
         COALESCE(
-          STRING_AGG(
-            DISTINCT m.nombre_archivo,
-            ', '
-            ORDER BY m.nombre_archivo
-          ) FILTER (
-            WHERE m.tipo = 'VIDEO'
-              AND m.activo = TRUE
-          ),
+          mr.nombres_video,
           'SIN ARCHIVO'
         ) AS nombre_archivo,
+
+        mr.fecha_subida_video,
+
         -- =============================================
-        -- FECHA DE SUBIDA DEL VIDEO
+        -- FOTOS
         -- =============================================
-        MAX(
-          m.fecha_creacion
-        ) FILTER (
-          WHERE m.tipo = 'VIDEO'
-            AND m.activo = TRUE
-        ) AS fecha_subida_video,
-        -- =============================================
-        -- ESTADO DEL PEDIDO
-        -- =============================================
+
+        COALESCE(
+          mr.cantidad_fotos,
+          0
+        )::int AS cantidad_fotos,
+
         CASE
-          WHEN BOOL_OR(
-            pe.estado_pago = 'aprobado'
+          WHEN COALESCE(mr.cantidad_fotos, 0) >= 50
+          THEN 'COMPLETO'
+          ELSE 'PENDIENTE'
+        END AS estado_fotos,
+
+        mr.fecha_ultima_foto,
+
+        -- =============================================
+        -- PEDIDO
+        -- =============================================
+
+        CASE
+          WHEN COALESCE(
+            pr.tiene_pedido_pagado,
+            FALSE
           )
           THEN 'PAGADO'
           ELSE 'NO PAGADO'
         END AS estado_pedido
+
       FROM participantes p
+
       INNER JOIN categorias c
         ON c.id = p.categoria_id
-      LEFT JOIN multimedia m
-        ON m.participante_id = p.id
-       AND m.activo = TRUE
-      LEFT JOIN pedido_items pi
-        ON pi.participante_id = p.id
-      LEFT JOIN pedidos pe
-        ON pe.id = pi.pedido_id
+
+      LEFT JOIN multimedia_resumen mr
+        ON mr.participante_id = p.id
+
+      LEFT JOIN pedidos_resumen pr
+        ON pr.participante_id = p.id
+
       WHERE c.evento_id = $1
-      GROUP BY
-        p.id,
-        c.id,
-        c.nombre_categoria,
-        c.orden_categoria,
-        p.nombre_completo,
-        p.dorsal_numero,
-        p.academia
+
       ORDER BY
         CASE
           WHEN p.dorsal_numero ~ '^[0-9]+$'
           THEN p.dorsal_numero::integer
           ELSE NULL
         END ASC NULLS LAST,
+
         p.dorsal_numero ASC,
         c.orden_categoria ASC,
         p.nombre_completo ASC
@@ -197,19 +251,12 @@ export const getEventDashboard = async (
     // 5. CALCULAR RESUMEN
     // =====================================================
     const totalParticipantes = registros.length;
-    const videosSubidos = registros.filter(
-      registro => registro.estado_video === 'SUBIDO'
-    ).length;
-    const videosPendientes = registros.filter(
-      registro => registro.estado_video === 'PENDIENTE'
-    ).length;
-    const pagados = registros.filter(
-      registro => registro.estado_pedido === 'PAGADO'
-    ).length;
-    const noPagados = registros.filter(
-      registro => registro.estado_pedido === 'NO PAGADO'
-    ).length;
-
+    const videosSubidos = registros.filter(registro => registro.estado_video === 'SUBIDO').length;
+    const videosPendientes = registros.filter(registro => registro.estado_video === 'PENDIENTE').length;
+    const pagados = registros.filter(registro => registro.estado_pedido === 'PAGADO').length;
+    const noPagados = registros.filter(registro => registro.estado_pedido === 'NO PAGADO').length;
+    const fotosCompletas = registros.filter(registro => registro.estado_fotos === 'COMPLETO').length;
+    const fotosPendientes = registros.filter(registro => registro.estado_fotos === 'PENDIENTE').length;
     // =====================================================
     // 6. SI ES TÉCNICO: QUITAR INFORMACIÓN DE PAGOS
     // =====================================================
@@ -230,16 +277,18 @@ export const getEventDashboard = async (
       rol: esAdmin ? 'admin' : 'tecnico',
       puedeVerPagos: esAdmin,
       resumen: {
-        totalParticipantes,
-        videosSubidos,
-        videosPendientes,
-        ...(esAdmin
-          ? {
-              pagados,
-              noPagados
-            }
-          : {})
-      },
+      totalParticipantes,
+      videosSubidos,
+      videosPendientes,
+      fotosCompletas,
+      fotosPendientes,
+      ...(esAdmin
+        ? {
+            pagados,
+            noPagados
+          }
+        : {})
+    },
       total: registros.length,
       registros
     });

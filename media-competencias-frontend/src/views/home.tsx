@@ -19,6 +19,57 @@ export const Home: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [busquedaEvento, setBusquedaEvento] = useState('');
+    const [mostrarVideoHero, setMostrarVideoHero] = useState(false);
+    const [videoHeroError, setVideoHeroError] = useState(false);
+    const [fotoDesktopDisponible, setFotoDesktopDisponible] = useState(false);
+    const [fotoMobileDisponible, setFotoMobileDisponible] = useState(false);
+
+    // Verificar si existen las fotografías
+    useEffect(() => {
+        let activo = true;
+        const verificarImagen = (ruta: string, actualizar: (valor: boolean) => void) => {
+            const imagen = new Image();
+            imagen.onload = () => {
+                if (activo) actualizar(true);
+            };
+            imagen.onerror = () => {
+                if (activo) actualizar(false);
+            };
+            imagen.src = ruta;
+        };
+
+        verificarImagen('/hero-recap-desktop.webp', setFotoDesktopDisponible);
+        verificarImagen('/hero-recap-mobile.webp', setFotoMobileDisponible);
+
+        return () => {
+            activo = false;
+        };
+    }, []);
+
+    // Reproducir video solo en escritorio y cuando corresponda
+    useEffect(() => {
+        const mediaQuery = window.matchMedia(
+            '(min-width: 768px) and (prefers-reduced-motion: no-preference)'
+        );
+
+        const actualizarVideo = () => {
+            const conexion = (
+                navigator as Navigator & {
+                    connection?: { saveData?: boolean };
+                }
+            ).connection;
+            setMostrarVideoHero(
+                mediaQuery.matches && !conexion?.saveData
+            );
+        };
+
+        actualizarVideo();
+        mediaQuery.addEventListener('change', actualizarVideo);
+
+        return () => {
+            mediaQuery.removeEventListener('change', actualizarVideo);
+        };
+    }, []);
 
     // Fetch de eventos desde el backend
     useEffect(() => {
@@ -60,27 +111,75 @@ export const Home: React.FC = () => {
 
     const handleSelectEvento = (eventoSlug: string) => {
         console.log(
-    'NAVEGANDO A EVENTO:',
-    eventoSlug
-  );
+            'NAVEGANDO A EVENTO:',
+            eventoSlug
+        );
         navigate(`/${eventoSlug}`);
     };
 
     return (
         <div className="bg-[#0D111C] text-[#E2E8F0] min-h-screen font-sans selection:bg-red-600/30 selection:text-white antialiased scroll-smooth">
             {/* 1. HERO SECTION */}
-            <section className="relative min-h-[85vh] flex items-center justify-center px-6 overflow-hidden">
+            <section className="relative min-h-[85svh] flex items-center justify-center px-6 py-16 overflow-hidden bg-[#0D111C]">
+                {/* FOTOGRAFÍA MÓVIL */}
+                {fotoMobileDisponible && (
+                    <div className="absolute inset-0 md:hidden bg-cover bg-center"
+                        style={{
+                            backgroundImage: "url('/hero-recap-mobile.webp')"
+                        }}
+                    />
+                )}
+                {/* FOTOGRAFÍA ESCRITORIO */}
+                {fotoDesktopDisponible && (
+                    <div className="absolute inset-0 hidden md:block bg-cover bg-center"
+                        style={{
+                            backgroundImage: "url('/hero-recap-desktop.webp')"
+                        }}
+                    />
+                )}
+                {/* VIDEO ESCRITORIO */}
+                {mostrarVideoHero && !videoHeroError && (
+                    <video
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        aria-hidden="true"
+                        onError={() => setVideoHeroError(true)}
+                        className="absolute inset-0 w-full h-full object-cover"
+                    >
+                        <source src="/hero-recap.mp4" type="video/mp4" />
+                    </video>
+                )}
+                {/* OSCURECIMIENTO SOLO CUANDO HAY MULTIMEDIA */}
+                <div className={`absolute inset-0 pointer-events-none
+                    ${mostrarVideoHero && !videoHeroError ||
+                        fotoDesktopDisponible ||
+                        fotoMobileDisponible
+                        ? 'bg-[#0D111C]/55'
+                        : ''
+                    }
+                        `}/>
+                {/* DEGRADADO INFERIOR */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0D111C] via-transparent to-transparent pointer-events-none" />
+                {/* EFECTOS ORIGINALES DEL HERO */}
                 <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 rounded-full blur-[140px] pointer-events-none" />
                 <div className="absolute bottom-10 right-10 w-80 h-80 bg-fuchsia-600/5 rounded-full blur-[100px] pointer-events-none" />
-
-                <div className="max-w-4xl mx-auto text-center z-10 space-y-8">
-                    <div className="inline-flex items-center bg-slate-900 border border-slate-800 text-red-400 text-[11px] font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
+                {/* CONTENIDO ORIGINAL */}
+                <div className="relative max-w-4xl mx-auto text-center z-10 space-y-8">
+                    {/* ETIQUETA SUPERIOR */}
+                    <div className="inline-flex items-center bg-slate-900/70 backdrop-blur-sm border border-slate-700/60 text-red-400 text-[11px] font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
                         Producción Audiovisual Profesional
                     </div>
 
+                    {/* TÍTULO */}
                     <h1
                         className="text-5xl sm:text-7xl md:text-8xl font-black leading-none uppercase mb-6 italic tracking-wide"
-                        style={{ fontFamily: '"Barlow Condensed", sans-serif', letterSpacing: '0.02em' }}
+                        style={{
+                            fontFamily: '"Barlow Condensed", sans-serif',
+                            letterSpacing: '0.02em'
+                        }}
                     >
                         <span className="block text-white">Tu baile,</span>
                         <span className="block text-white">tu momento,</span>
@@ -89,40 +188,68 @@ export const Home: React.FC = () => {
                         </span>
                     </h1>
 
+                    {/* NOMBRE RECAP */}
                     <div className="inline-flex items-center justify-center gap-3 mb-8">
-                        <div className="h-px w-12 bg-red-500/60"></div>
+                        <div className="h-px w-12 bg-red-500/60" />
+
                         <span
-                            className="text-xl font-bold tracking-[0.25em] text-slate-300 uppercase"
+                            className="text-xl font-bold tracking-[0.25em] text-slate-200 uppercase"
                             style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
                         >
                             RECAP DANCE
                         </span>
-                        <div className="h-px w-12 bg-red-500/60"></div>
+
+                        <div className="h-px w-12 bg-red-500/60" />
                     </div>
 
+                    {/* BOTONES */}
                     <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
+
                         <a
                             href="#eventos"
                             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-red-600 text-white px-7 py-4 rounded-xl font-semibold text-xs tracking-widest uppercase hover:bg-red-500 transition-all hover:scale-105 duration-300 text-center shadow-lg shadow-red-600/20"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-play">
-                                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polygon points="6 3 20 12 6 21 6 3" />
                             </svg>
                             Ver mis fotos y videos
                         </a>
+
                         <a
                             href="#quienes-somos"
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#131926]/40 border border-slate-800/80 text-slate-300 hover:text-white hover:border-red-600/50 px-7 py-4 rounded-xl font-semibold text-xs tracking-widest uppercase transition-all duration-300 hover:scale-105 text-center shadow-inner shadow-black/10"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#131926]/50 backdrop-blur-sm border border-slate-700/80 text-slate-200 hover:text-white hover:border-red-600/50 px-7 py-4 rounded-xl font-semibold text-xs tracking-widest uppercase transition-all duration-300 hover:scale-105 text-center"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-camera">
-                                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
-                                <circle cx="12" cy="13" r="3"></circle>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                                <circle cx="12" cy="13" r="3" />
                             </svg>
                             Conocer más
                         </a>
+
                     </div>
                 </div>
             </section>
+
 
             {/* 2. SECCIÓN DE EVENTOS CON BUSCADOR */}
             <section id="eventos" className="max-w-6xl mx-auto px-6 py-24 scroll-mt-20">
