@@ -7,6 +7,7 @@ import { auth } from '../firebase/firebase';
 
 interface PaqueteSeleccionado {
   id: string;
+  evento_id: string;
   nombre_paquete: string;
   descripcion: string;
   precio: number;
@@ -233,6 +234,7 @@ export default function MediaSelectionPage() {
       addToCart(
         {
           id: paquete.id,
+          evento_id: paquete.evento_id,
           nombre_paquete: paquete.nombre_paquete,
           descripcion: paquete.descripcion || '',
           precio: Number(paquete.precio),

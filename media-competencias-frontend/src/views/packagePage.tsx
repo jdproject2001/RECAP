@@ -47,6 +47,9 @@ const AVATAR_COLORS = [
   "bg-emerald-800", "bg-orange-800",
 ];
 
+const CHILE_EVENT_SLUG = 'stagechile';
+const USD_TO_CLP = 910;
+
 function initials(name: string) {
   if (!name) return "??";
   return name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
@@ -61,7 +64,6 @@ export default function PackagesPage() {
   const location = useLocation();
   const { addToCart } = useCart(); // <-- Importamos la función del carrito
   const [showAuthModal, setShowAuthModal] = useState(false);
-
   const stateData = location.state as {
     participante?: ParticipanteDTO;
     evento?: Evento;
@@ -73,14 +75,19 @@ export default function PackagesPage() {
   const [paquetesBD, setPaquetesBD] = useState<PaqueteDTO[]>(stateData?.paquetes || []);
   const [loading, setLoading] = useState(!stateData?.participante || !stateData?.evento);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedType, setSelectedType] = useState<'combo' | 'foto' | 'video'>('combo');
   const [selectedFotoPackageId, setSelectedFotoPackageId] = useState<string | null>(null);
   const [selectedComboPackageId, setSelectedComboPackageId] = useState<string | null>(null);
-
   const [multimediaDisponibles, setMultimediaDisponibles] = useState<MultimediaDTO[] | null>(null);
   const [, setCheckingMedia] = useState(false);
   const [pendingAction, setPendingAction] = useState<'ADD' | 'BUY' | null>(null);
+  const esEventoChile = eventSlug === CHILE_EVENT_SLUG;
+  const convertirAClp = (precio: number | string) => {
+    return Math.round(Number(precio) * USD_TO_CLP);
+  };
+  const formatearClp = (precio: number | string) => {
+    return convertirAClp(precio).toLocaleString('es-CL');
+  };
 
   useEffect(() => {
     if (participante && evento && paquetesBD.length > 0) {
@@ -608,10 +615,15 @@ export default function PackagesPage() {
                     <div className="mt-auto pt-4 border-t border-slate-800">
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-4xl font-black text-white" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-                          ${Number(currentCombo.precio).toFixed(2)}
+                          {formatearClp(currentCombo.precio)}
                         </span>
-                        <span className="text-xs font-semibold text-slate-400">USD</span>
+                        <span className="text-xs font-semibold text-slate-400">CLP</span>
                       </div>
+                      {esEventoChile && (
+                        <p className="text-sm text-slate-400 mt-1">
+                          ${Number(currentCombo.precio).toFixed(2)} USD
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className={`px-6 py-3.5 border-t text-center text-xs font-bold uppercase tracking-wider transition-colors ${isSelected ? "bg-red-600 border-red-600 text-white" : "border-slate-800 text-slate-400 bg-[#0e0f14]"}`} style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
@@ -642,13 +654,22 @@ export default function PackagesPage() {
                       <div className="flex gap-2">
                         {paquetesFoto.map((pkg) => (
                           <button
-                            key={pkg.id} type="button"
-                            onClick={() => { setSelectedType('foto'); setSelectedFotoPackageId(pkg.id); }}
-                            className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${selectedFotoPackageId === pkg.id ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20" : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
-                              }`}
+                            key={pkg.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedType('foto');
+                              setSelectedFotoPackageId(pkg.id);
+                            }}
+                            className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${
+                              selectedFotoPackageId === pkg.id
+                                ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20"
+                                : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
+                            }`}
                             style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
                           >
-                            {pkg.cantidad_fotos || pkg.nombre_paquete.replace(/\D/g, "") || "1"}
+                            {pkg.cantidad_fotos == null
+                              ? 'ILIMITADAS'
+                              : pkg.cantidad_fotos}
                           </button>
                         ))}
                       </div>
@@ -656,9 +677,15 @@ export default function PackagesPage() {
 
                     <div className="mt-auto pt-4 border-t border-slate-800">
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-4xl font-black text-white" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>${Number(currentFoto.precio).toFixed(2)}</span>
-                        <span className="text-xs font-semibold text-slate-400">USD</span>
+                        <span className="text-4xl font-black text-white" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                        >{formatearClp(currentFoto.precio)}</span>
+                        <span className="text-xs font-semibold text-slate-400">CLP</span>
                       </div>
+                      {esEventoChile && (
+                        <p className="text-sm text-slate-400 mt-1">
+                          ${Number(currentFoto.precio).toFixed(2)} USD
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className={`px-6 py-3.5 border-t text-center text-xs font-bold uppercase tracking-wider transition-colors ${isSelected ? "bg-red-600 border-red-600 text-white" : "border-slate-800 text-slate-400 bg-[#0e0f14]"}`} style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
@@ -686,9 +713,15 @@ export default function PackagesPage() {
 
                     <div className="mt-auto pt-4 border-t border-slate-800">
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-4xl font-black text-white" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>${Number(currentVideo.precio).toFixed(2)}</span>
-                        <span className="text-xs font-semibold text-slate-400">USD</span>
+                        <span className="text-4xl font-black text-white" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                        >{formatearClp(currentVideo.precio)}</span>
+                        <span className="text-xs font-semibold text-slate-400">CLP</span>
                       </div>
+                      {esEventoChile && (
+                        <p className="text-sm text-slate-400 mt-1">
+                          ${Number(currentVideo.precio).toFixed(2)} USD
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className={`px-6 py-3.5 border-t text-center text-xs font-bold uppercase tracking-wider transition-colors ${isSelected ? "bg-red-600 border-red-600 text-white" : "border-slate-800 text-slate-400 bg-[#0e0f14]"}`} style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
@@ -697,8 +730,13 @@ export default function PackagesPage() {
                 </div>
               );
             })()}
-          </div>
 
+          </div>
+          {esEventoChile && (
+            <p className="text-s text-slate-500 text-center mb-6">
+              El valor en pesos chilenos es referencial. El cobro se procesa en USD y el valor final en CLP puede variar según el tipo de cambio de tu banco.
+            </p>
+          )}
           {/* BARRA INFERIOR DE RESUMEN Y ACCIONES DE COMPRA */}
           {activePackage && (
             <div className="sticky bottom-6 bg-[#12131A] border border-red-600/40 rounded-2xl px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md">
@@ -718,9 +756,20 @@ export default function PackagesPage() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-                <span className="text-3xl font-black text-red-500 whitespace-nowrap" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-                  ${Number(activePackage.precio).toFixed(2)} USD
-                </span>
+                <div className="text-center sm:text-right">
+                  <span
+                    className="block text-3xl font-black text-red-500 whitespace-nowrap"
+                    style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                  >
+                    {formatearClp(activePackage.precio)} CLP
+                  </span>
+
+                  {esEventoChile && (
+                    <span className="block text-sm text-slate-400 mt-0.5">
+                      {Number(activePackage.precio).toFixed(2)} USD
+                    </span>
+                  )}
+                </div>
 
                 {/* BOTONES DUALES DE CARRITO */}
                 <div className="flex items-center gap-2 w-full sm:w-auto">

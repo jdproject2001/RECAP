@@ -18,14 +18,29 @@ interface PayphoneConfig {
   phoneNumber?: string;
 }
 
+const CHILE_EVENT_ID = '5fdd4ccd-32eb-410d-a7a9-e223320607ae';
+const USD_TO_CLP = 910;
+
 export const Checkout: React.FC<{
   onBackToCatalog: () => void;
 }> = ({ onBackToCatalog }) => {
   const { cart, getCartTotal } = useCart();
+  const esEventoChile =
+    cart.length > 0 &&
+    cart.every(
+      item =>
+        item.paquete.evento_id === CHILE_EVENT_ID
+    );
 
-  // =====================================================
-  // ESTADOS
-  // =====================================================
+  const convertirAClp = (precio: number | string) => {
+    return Math.round(
+      Number(precio) * USD_TO_CLP
+    );
+  };
+
+  const formatearClp = (precio: number | string) => {
+    return convertirAClp(precio).toLocaleString('es-CL');
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payphoneConfig, setPayphoneConfig] = useState<PayphoneConfig | null>(null);
@@ -578,13 +593,21 @@ export const Checkout: React.FC<{
                         </p>
                       </div>
 
-                      <p className="font-bold text-slate-900 whitespace-nowrap">
-                        $
-                        {Number(
-                          item.paquete
-                            .precio
-                        ).toFixed(2)}
-                      </p>
+                      {item.paquete.evento_id === CHILE_EVENT_ID ? (
+                        <div className="text-right whitespace-nowrap">
+                          <p className="font-black text-slate-900 text-base">
+                            ${formatearClp(item.paquete.precio)} CLP
+                          </p>
+
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            ${Number(item.paquete.precio).toFixed(2)} USD
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="font-bold text-slate-900 whitespace-nowrap">
+                          ${Number(item.paquete.precio).toFixed(2)} USD
+                        </p>
+                      )}
                     </div>
                   )
                 )}
@@ -652,10 +675,11 @@ export const Checkout: React.FC<{
                   <p className="text-xs font-bold text-green-700">
                     ✓ Código {descuentoAplicado.codigo} aplicado
                   </p>
-
                   <p className="text-xs text-green-600 mt-1">
-                    Ahorras $
-                    {descuentoAplicado.descuento.toFixed(2)}
+                    {esEventoChile
+                      ? `Ahorras $${formatearClp(descuentoAplicado.descuento)} CLP`
+                      : `Ahorras $${descuentoAplicado.descuento.toFixed(2)} USD`
+                    }
                   </p>
                 </div>
               )}
@@ -668,18 +692,46 @@ export const Checkout: React.FC<{
                     <span className="text-sm text-slate-500">
                       Subtotal
                     </span>
-                    <span className="text-sm font-bold text-slate-700">
-                      ${descuentoAplicado.subtotal.toFixed(2)}
-                    </span>
+                    <div className="text-right">
+                      {esEventoChile ? (
+                        <>
+                          <p className="text-sm font-bold text-slate-700">
+                            ${formatearClp(descuentoAplicado.subtotal)} CLP
+                          </p>
+
+                          <p className="text-xs text-slate-400">
+                            ${descuentoAplicado.subtotal.toFixed(2)} USD
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-sm font-bold text-slate-700">
+                          ${descuentoAplicado.subtotal.toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-sm font-bold text-green-600">
                       Descuento {descuentoAplicado.codigo}
                     </span>
-                    <span className="text-sm font-bold text-green-600">
-                      -${descuentoAplicado.descuento.toFixed(2)}
-                    </span>
+                    <div className="text-right">
+                      {esEventoChile ? (
+                        <>
+                          <p className="text-sm font-bold text-green-600">
+                            -${formatearClp(descuentoAplicado.descuento)} CLP
+                          </p>
+
+                          <p className="text-xs text-green-500">
+                            -${descuentoAplicado.descuento.toFixed(2)} USD
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-sm font-bold text-green-600">
+                          -${descuentoAplicado.descuento.toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -688,9 +740,36 @@ export const Checkout: React.FC<{
                 <span className="font-black text-slate-900">
                   Total:
                 </span>
-                <span className="text-2xl font-black text-indigo-600">
-                  ${(descuentoAplicado ? descuentoAplicado.total : getCartTotal()).toFixed(2)} USD
-                </span>
+
+                {esEventoChile ? (
+                  <div className="text-right">
+                    <p className="text-3xl font-black text-indigo-600">
+                      ${formatearClp(
+                        descuentoAplicado
+                          ? descuentoAplicado.total
+                          : getCartTotal()
+                      )} CLP
+                    </p>
+
+                    <p className="text-sm text-slate-400 mt-0.5">
+                      $
+                      {(
+                        descuentoAplicado
+                          ? descuentoAplicado.total
+                          : getCartTotal()
+                      ).toFixed(2)} USD
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-2xl font-black text-indigo-600">
+                    $
+                    {(
+                      descuentoAplicado
+                        ? descuentoAplicado.total
+                        : getCartTotal()
+                    ).toFixed(2)} USD
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -719,7 +798,18 @@ export const Checkout: React.FC<{
                   onClick={prepararCheckout}
                   className="w-full text-white font-bold py-4 px-4 rounded-xl transition-colors text-sm bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
                 >
-                  Continuar al pago ${(descuentoAplicado ? descuentoAplicado.total : getCartTotal()).toFixed(2)}
+                  {esEventoChile
+                    ? `Continuar al pago $${formatearClp(
+                        descuentoAplicado
+                          ? descuentoAplicado.total
+                          : getCartTotal()
+                      )} CLP`
+                    : `Continuar al pago $${(
+                        descuentoAplicado
+                          ? descuentoAplicado.total
+                          : getCartTotal()
+                      ).toFixed(2)} USD`
+                  }
                 </button>
               </div>
             )}

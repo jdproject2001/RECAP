@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, type ReactNode }
 // 1. Definimos las interfaces según nuestro modelo de base de datos
 export interface Paquete {
   id: string;
+  evento_id: string;
   nombre_paquete: string;
   descripcion: string;
   precio: number; // Postgres lo devuelve como string para evitar pérdida de decimales

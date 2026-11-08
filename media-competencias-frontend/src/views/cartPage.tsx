@@ -3,10 +3,27 @@ import { ArrowLeft, Trash2, ShoppingCart } from "lucide-react";
 import { useCart } from "../context/cartContext";
 import { useAuth } from "../context/authContext";
 
+const CHILE_EVENT_ID = '5fdd4ccd-32eb-410d-a7a9-e223320607ae';
+const USD_TO_CLP = 910;
+
 export default function CartPage() {
     const navigate = useNavigate();
     const { cart, removeFromCart, clearCart } = useCart();
     const { user } = useAuth();
+    const esEventoChile =
+    cart.length > 0 &&
+    cart.every(
+        item =>
+        item.paquete?.evento_id === CHILE_EVENT_ID
+    );
+
+    const convertirAClp = (precio: number) => {
+    return Math.round(precio * USD_TO_CLP);
+    };
+
+    const formatearClp = (precio: number) => {
+    return convertirAClp(precio).toLocaleString('es-CL');
+    };
 
     // Función de apoyo para extraer el precio sin riesgo de NaN
     const getItemPrice = (item: any): number => {
@@ -131,9 +148,20 @@ export default function CartPage() {
                                         </div>
 
                                         <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800/60">
-                                            <span className="text-2xl font-black text-red-500" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-                                                ${price.toFixed(2)}
-                                            </span>
+                                            {paquete.evento_id === CHILE_EVENT_ID ? (
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-black text-red-500 whitespace-nowrap" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                                                    >{formatearClp(price)} CLP
+                                                    </p>
+                                                    <p className="text-xs text-slate-400 mt-0.5">
+                                                    ${price.toFixed(2)} USD
+                                                    </p>
+                                                </div>
+                                                ) : (
+                                                <span className="text-2xl font-black text-red-500" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                                                >${price.toFixed(2)} USD
+                                                </span>
+                                                )}
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveItem(item)}
@@ -160,21 +188,53 @@ export default function CartPage() {
                             <h3 className="font-bold text-lg mb-4 text-white uppercase" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
                                 Resumen del Pedido
                             </h3>
-
                             <div className="flex justify-between items-center text-slate-400 text-sm mb-3">
-                                <span>Subtotal ({cart.length} {cart.length === 1 ? 'ítem' : 'ítems'})</span>
-                                <span className="text-white font-medium">${total.toFixed(2)}</span>
-                            </div>
+                                <span>
+                                    Subtotal ({cart.length} {cart.length === 1 ? 'ítem' : 'ítems'})
+                                </span>
+
+                                {esEventoChile ? (
+                                    <div className="text-right">
+                                    <p className="text-white font-bold">
+                                        {formatearClp(total)} CLP
+                                    </p>
+
+                                    <p className="text-xs text-slate-500">
+                                        ${total.toFixed(2)} USD
+                                    </p>
+                                    </div>
+                                ) : (
+                                    <span className="text-white font-medium">
+                                    ${total.toFixed(2)} USD
+                                    </span>
+                                )}
+                                </div>
 
                             <div className="border-t border-slate-800 my-4"></div>
-
                             <div className="flex justify-between items-center mb-6">
                                 <span className="font-bold text-white">Total</span>
-                                <span className="text-3xl font-black text-red-500" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
-                                    ${total.toFixed(2)} <span className="text-xs text-slate-400">USD</span>
-                                </span>
+                                {esEventoChile ? (
+                                    <div className="text-right">
+                                    <p className="text-3xl font-black text-red-500 whitespace-nowrap" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                                    >{formatearClp(total)} CLP
+                                    </p>
+                                    <p className="text-sm text-slate-400 mt-0.5">
+                                        ${total.toFixed(2)} USD
+                                    </p>
+                                    </div>
+                                ) : (
+                                    <span className="text-3xl font-black text-red-500" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+                                    >${total.toFixed(2)}
+                                    <span className="text-xs text-slate-400 ml-1">USD</span>
+                                    </span>
+                                )}
                             </div>
-
+                            {esEventoChile && (
+                                <p className="text-[11px] text-slate-500 mb-4">
+                                    Valor aproximado en pesos chilenos. El cobro se procesa en USD
+                                    y el monto final puede variar según el tipo de cambio de tu banco.
+                                </p>
+                            )}
                             <div className="text-xs text-slate-500 space-y-1 mb-4">
                                 {reservas > 0 && (
                                     <p>{reservas} {reservas === 1 ? 'reserva' : 'reservas'}</p>
