@@ -884,52 +884,150 @@ export const getMyPurchases = async (
 
                 estadoMaterial = 'PAGO_PENDIENTE';
 
-            } else if (row.multimedia_seleccionados > 0) {
-
-                estadoMaterial = 'MATERIAL_SELECCIONADO';
-
             } else {
 
-                let materialSuficiente = false;
+                const cantidadFotosRequeridas =
+                    row.cantidad_fotos == null
+                        ? null
+                        : Number(row.cantidad_fotos);
+
+                const fotosSeleccionadas =
+                    Number(row.fotos_seleccionadas || 0);
+
+                const videosSeleccionados =
+                    Number(row.videos_seleccionados || 0);
+
+                const fotosDisponibles =
+                    Number(row.fotos_disponibles || 0);
+
+                const videosDisponibles =
+                    Number(row.videos_disponibles || 0);
+
+                let seleccionCompleta = false;
+                let puedeSeleccionarMas = false;
+
+                // =====================================================
+                // SOLO FOTO
+                // =====================================================
 
                 if (row.paquete_tipo === 'foto') {
 
-                    const cantidadFotosRequeridas =
-                        row.cantidad_fotos == null
-                            ? null
-                            : Number(row.cantidad_fotos);
+                    // Ilimitadas
+                    if (cantidadFotosRequeridas === null) {
 
-                    materialSuficiente =
-                        cantidadFotosRequeridas === null
-                            ? row.fotos_disponibles >= 1
-                            : row.fotos_disponibles >= cantidadFotosRequeridas;
+                        seleccionCompleta =
+                            fotosSeleccionadas > 0;
 
-                } else if (row.paquete_tipo === 'video') {
+                        // Mientras existan fotos que todavía no fueron seleccionadas
+                        puedeSeleccionarMas =
+                            fotosDisponibles > fotosSeleccionadas;
 
-                    materialSuficiente =
-                        row.videos_disponibles >= 1;
+                    } else {
 
-                } else if (row.paquete_tipo === 'combo') {
+                        seleccionCompleta =
+                            fotosSeleccionadas >= cantidadFotosRequeridas;
 
-                    const cantidadFotosRequeridas =
-                        row.cantidad_fotos == null
-                            ? null
-                            : Number(row.cantidad_fotos);
-
-                    const fotosSuficientes =
-                        cantidadFotosRequeridas === null
-                            ? row.fotos_disponibles >= 1
-                            : row.fotos_disponibles >= cantidadFotosRequeridas;
-
-                    materialSuficiente =
-                        fotosSuficientes &&
-                        row.videos_disponibles >= 1;
+                        puedeSeleccionarMas =
+                            fotosSeleccionadas < cantidadFotosRequeridas &&
+                            fotosDisponibles > fotosSeleccionadas;
+                    }
                 }
 
-                estadoMaterial =
-                    materialSuficiente
-                        ? 'DISPONIBLE_PARA_SELECCIONAR'
-                        : 'MATERIAL_PENDIENTE';
+                // =====================================================
+                // SOLO VIDEO
+                // =====================================================
+
+                else if (row.paquete_tipo === 'video') {
+
+                    seleccionCompleta =
+                        videosSeleccionados >= 1;
+
+                    puedeSeleccionarMas =
+                        videosSeleccionados < 1 &&
+                        videosDisponibles > 0;
+                }
+
+                // =====================================================
+                // COMBO
+                // =====================================================
+
+                else if (row.paquete_tipo === 'combo') {
+
+                    const videoCompleto =
+                        videosSeleccionados >= 1;
+
+                    // Fotos ilimitadas
+                    if (cantidadFotosRequeridas === null) {
+
+                        const tieneFotos =
+                            fotosSeleccionadas > 0;
+
+                        seleccionCompleta =
+                            tieneFotos &&
+                            videoCompleto;
+
+                        puedeSeleccionarMas =
+                            fotosDisponibles > fotosSeleccionadas ||
+                            (
+                                !videoCompleto &&
+                                videosDisponibles > 0
+                            );
+
+                    } else {
+
+                        const fotosCompletas =
+                            fotosSeleccionadas >= cantidadFotosRequeridas;
+
+                        seleccionCompleta =
+                            fotosCompletas &&
+                            videoCompleto;
+
+                        puedeSeleccionarMas =
+                            (
+                                !fotosCompletas &&
+                                fotosDisponibles > fotosSeleccionadas
+                            ) ||
+                            (
+                                !videoCompleto &&
+                                videosDisponibles > 0
+                            );
+                    }
+                }
+
+                // =====================================================
+                // ESTADO FINAL
+                // =====================================================
+
+                if (
+                    puedeSeleccionarMas &&
+                    !seleccionCompleta
+                ) {
+
+                    estadoMaterial =
+                        'DISPONIBLE_PARA_SELECCIONAR';
+
+                } else if (
+                    seleccionCompleta
+                ) {
+
+                    // Para ilimitados, si todavía hay más fotos disponibles,
+                    // también permitimos seguir seleccionando.
+                    if (
+                        cantidadFotosRequeridas === null &&
+                        fotosDisponibles > fotosSeleccionadas
+                    ) {
+                        estadoMaterial =
+                            'DISPONIBLE_PARA_SELECCIONAR';
+                    } else {
+                        estadoMaterial =
+                            'MATERIAL_SELECCIONADO';
+                    }
+
+                } else {
+
+                    estadoMaterial =
+                        'MATERIAL_PENDIENTE';
+                }
             }
 
             // ===================================================
@@ -1094,26 +1192,39 @@ export const selectMaterialForOrderItem = async (
             res.status(400).json({ error: 'El pedido todavía no tiene un pago aprobado.' });
             return;
         }
+        // =====================================================
+        // 4. Obtener selección existente
+        // =====================================================
 
-        // =====================================================
-        // 4. Verificar que no tenga selección previa
-        // =====================================================
         const seleccionExistente = await client.query(
             `
-      SELECT id
-      FROM pedido_item_multimedia
-      WHERE pedido_item_id = $1
-      LIMIT 1
-      `,
+            SELECT
+                pim.multimedia_id,
+                m.tipo
+            FROM pedido_item_multimedia pim
+            INNER JOIN multimedia m
+                ON m.id = pim.multimedia_id
+            WHERE pim.pedido_item_id = $1
+                AND m.activo = true
+            `,
             [pedidoItemId]
         );
 
-        if (seleccionExistente.rows.length > 0) {
-            await client.query('ROLLBACK');
-            res.status(409).json({ error: 'Este pedido ya tiene material seleccionado.' });
-            return;
-        }
+        const multimediaIdsExistentes = new Set<string>(
+            seleccionExistente.rows.map(
+                row => row.multimedia_id
+            )
+        );
 
+        const fotosExistentes =
+            seleccionExistente.rows.filter(
+                row => row.tipo === 'FOTO'
+            ).length;
+
+        const videosExistentes =
+            seleccionExistente.rows.filter(
+                row => row.tipo === 'VIDEO'
+            ).length;
         // =====================================================
         // 5. Evitar multimedia duplicado
         // =====================================================
@@ -1122,6 +1233,25 @@ export const selectMaterialForOrderItem = async (
         if (multimediaIdsUnicos.length !== multimedia_ids.length) {
             await client.query('ROLLBACK');
             res.status(400).json({ error: 'No puedes seleccionar el mismo archivo más de una vez.' });
+            return;
+        }
+
+        // =====================================================
+        // Obtener únicamente multimedia NUEVO
+        // =====================================================
+
+        const multimediaIdsNuevos =
+            multimediaIdsUnicos.filter(
+                id => !multimediaIdsExistentes.has(id)
+            );
+
+        if (multimediaIdsNuevos.length === 0) {
+            await client.query('ROLLBACK');
+
+            res.status(400).json({
+                error: 'No seleccionaste ningún archivo nuevo.'
+            });
+
             return;
         }
 
@@ -1139,12 +1269,17 @@ export const selectMaterialForOrderItem = async (
       FROM multimedia
       WHERE id = ANY($1::uuid[])
       `,
-            [multimediaIdsUnicos]
+            [multimediaIdsNuevos]
         );
 
-        if (multimediaResult.rows.length !== multimediaIdsUnicos.length) {
+        if (
+            multimediaResult.rows.length !==
+            multimediaIdsNuevos.length
+        ) {
             await client.query('ROLLBACK');
-            res.status(400).json({ error: 'Uno o más archivos seleccionados no existen.' });
+            res.status(400).json({
+                error: 'Uno o más archivos seleccionados no existen.'
+            });
             return;
         }
 
@@ -1176,13 +1311,23 @@ export const selectMaterialForOrderItem = async (
         // =====================================================
         // 8. Contar fotos y videos
         // =====================================================
-        const cantidadFotos = multimediaRows.filter(
-            m => m.tipo === 'FOTO'
-        ).length;
 
-        const cantidadVideos = multimediaRows.filter(
-            m => m.tipo === 'VIDEO'
-        ).length;
+        const fotosNuevas =
+            multimediaRows.filter(
+                m => m.tipo === 'FOTO'
+            ).length;
+
+        const videosNuevos =
+            multimediaRows.filter(
+                m => m.tipo === 'VIDEO'
+            ).length;
+
+        // Total final del pedido
+        const cantidadFotos =
+            fotosExistentes + fotosNuevas;
+
+        const cantidadVideos =
+            videosExistentes + videosNuevos;
 
         const fotosRequeridas =
             item.cantidad_fotos == null
@@ -1275,27 +1420,46 @@ export const selectMaterialForOrderItem = async (
         }
 
         // =====================================================
-        // 10. Guardar selección
+        // 10. Guardar únicamente multimedia nuevo
         // =====================================================
-        for (const multimediaId of multimediaIdsUnicos) {
+
+        for (const multimediaId of multimediaIdsNuevos) {
+
             await client.query(
                 `
-        INSERT INTO pedido_item_multimedia (
-          pedido_item_id,
-          multimedia_id
-        )
-        VALUES ($1, $2)
-        `,
-                [pedidoItemId, multimediaId]
+                INSERT INTO pedido_item_multimedia (
+                pedido_item_id,
+                multimedia_id
+                )
+                VALUES ($1, $2)
+                `,
+                [
+                    pedidoItemId,
+                    multimediaId
+                ]
             );
         }
 
         await client.query('COMMIT');
 
         res.status(200).json({
-            message: 'Material seleccionado correctamente.',
-            pedido_item_id: pedidoItemId,
-            multimedia_seleccionados: multimediaIdsUnicos.length
+            message: 'Material actualizado correctamente.',
+
+            pedido_item_id:
+                pedidoItemId,
+
+            multimedia_agregados:
+                multimediaIdsNuevos.length,
+
+            total_multimedia:
+                seleccionExistente.rows.length +
+                multimediaIdsNuevos.length,
+
+            total_fotos:
+                cantidadFotos,
+
+            total_videos:
+                cantidadVideos
         });
 
     } catch (error) {
