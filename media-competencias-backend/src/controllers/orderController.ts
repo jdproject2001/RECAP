@@ -313,69 +313,94 @@ export const createOrder = async (
         const cantidadVideos = multimediaRows.filter(
           multimedia => multimedia.tipo === 'VIDEO'
         ).length;
+// -------------------------------------------------
+// 3.8 Validar según tipo de paquete
+// -------------------------------------------------
 
-        // -------------------------------------------------
-        // 3.8 Validar según tipo de paquete
-        // -------------------------------------------------
+const cantidadFotosPaquete = paquete.cantidad_fotos == null
+    ? null
+    : Number(paquete.cantidad_fotos);
+// -------------------------------------------------
 
-        if (paquete.tipo === 'foto') {
+if (paquete.tipo === 'foto') {
+  // Paquete con cantidad fija de fotos
+  if (
+    cantidadFotosPaquete !== null &&
+    cantidadFotos !== cantidadFotosPaquete
+  ) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" requiere exactamente ${cantidadFotosPaquete} fotos.`
+    );
+  }
 
-          if (
-            cantidadFotos !==
-            paquete.cantidad_fotos
-          ) {
-            throw new Error(
-              `El paquete "${paquete.nombre_paquete}" requiere exactamente ${paquete.cantidad_fotos} fotos.`
-            );
-          }
+  // Paquete de fotos ilimitadas
+  if (
+    cantidadFotosPaquete === null &&
+    cantidadFotos < 1
+  ) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" requiere seleccionar al menos una foto.`
+    );
+  }
 
-          if (cantidadVideos !== 0) {
-            throw new Error(
-              `El paquete "${paquete.nombre_paquete}" no permite seleccionar videos.`
-            );
-          }
-        }
-        // -------------------------------------------------
+  if (cantidadVideos !== 0) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" no permite seleccionar videos.`
+    );
+  }
+}
 
-        if (paquete.tipo === 'video') {
+// -------------------------------------------------
 
-          if (cantidadFotos !== 0) {
-            throw new Error(
-              `El paquete "${paquete.nombre_paquete}" no permite seleccionar fotos.`
-            );
-          }
+if (paquete.tipo === 'video') {
 
-          if (cantidadVideos !== 1) {
-            throw new Error(
-              `El paquete "${paquete.nombre_paquete}" requiere exactamente 1 video.`
-            );
-          }
-        }
+  if (cantidadFotos !== 0) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" no permite seleccionar fotos.`
+    );
+  }
 
-        // -------------------------------------------------
+  if (cantidadVideos !== 1) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" requiere exactamente 1 video.`
+    );
+  }
+}
 
-        if (paquete.tipo === 'combo') {
+// -------------------------------------------------
 
-          if (
-            cantidadFotos !==
-            paquete.cantidad_fotos
-          ) {
-            throw new Error(
-              `El paquete "${paquete.nombre_paquete}" requiere exactamente ${paquete.cantidad_fotos} fotos.`
-            );
-          }
+if (paquete.tipo === 'combo') {
 
-          if (cantidadVideos !== 1) {
-            throw new Error(
-              `El paquete "${paquete.nombre_paquete}" requiere exactamente 1 video.`
-            );
-          }
-        }
-      }
+  // Combo con cantidad fija de fotos
+  if (
+    cantidadFotosPaquete !== null &&
+    cantidadFotos !== cantidadFotosPaquete
+  ) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" requiere exactamente ${cantidadFotosPaquete} fotos.`
+    );
+  }
 
+  // Combo con fotos ilimitadas
+  if (
+    cantidadFotosPaquete === null &&
+    cantidadFotos < 1
+  ) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" requiere seleccionar al menos una foto.`
+    );
+  }
+
+  if (cantidadVideos !== 1) {
+    throw new Error(
+      `El paquete "${paquete.nombre_paquete}" requiere exactamente 1 video.`
+    );
+  }
+}
       if (tipo_compra === 'RESERVA') {
         multimediaIdsUnicos = [];
       }
+        
       // -------------------------------------------------
       // 3.9 Agregar precio real
       // -------------------------------------------------
