@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock3, Image as ImageIcon, Loader2, Video} from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock3, Image as ImageIcon, Loader2, Video } from 'lucide-react';
 import { API_BASE } from '../config/api';
 import { auth } from '../firebase/firebase';
 
@@ -23,7 +23,7 @@ interface Paquete {
   nombre_paquete: string;
   tipo: 'foto' | 'video' | 'combo';
   modalidad: string;
-  cantidad_fotos: number;
+  cantidad_fotos: number | null;
   tipo_formato: string;
   precio: number;
 }
@@ -39,10 +39,10 @@ interface PedidoItem {
   fotos_disponibles: number;
   videos_disponibles: number;
   estado_material:
-    | 'PAGO_PENDIENTE'
-    | 'MATERIAL_PENDIENTE'
-    | 'DISPONIBLE_PARA_SELECCIONAR'
-    | 'MATERIAL_SELECCIONADO';
+  | 'PAGO_PENDIENTE'
+  | 'MATERIAL_PENDIENTE'
+  | 'DISPONIBLE_PARA_SELECCIONAR'
+  | 'MATERIAL_SELECCIONADO';
 }
 
 interface Pedido {
@@ -110,7 +110,10 @@ export default function MisComprasPage() {
           descripcion: '',
           precio: Number(item.paquete.precio),
           tipo: item.paquete.tipo,
-          cantidad_fotos: Number(item.paquete.cantidad_fotos || 0)
+          cantidad_fotos:
+            item.paquete.cantidad_fotos == null
+              ? null
+              : Number(item.paquete.cantidad_fotos)
         },
         participante: {
           id: item.participante.id,
@@ -127,19 +130,19 @@ export default function MisComprasPage() {
   };
 
   const renderEstado = (
-  item: PedidoItem,
-  pedido: Pedido
-) => {
+    item: PedidoItem,
+    pedido: Pedido
+  ) => {
 
-  if (
-    pedido.estado_pago
-      ?.toLowerCase() === 'pendiente'
-  ) {
-    return (
-      <div className="flex flex-col gap-3">
+    if (
+      pedido.estado_pago
+        ?.toLowerCase() === 'pendiente'
+    ) {
+      return (
+        <div className="flex flex-col gap-3">
 
-        <div
-          className="
+          <div
+            className="
             border border-amber-500/20
             bg-amber-500/5
             rounded-2xl
@@ -147,18 +150,18 @@ export default function MisComprasPage() {
             text-amber-400
             font-bold
           "
-        >
-          Pago pendiente
-        </div>
+          >
+            Pago pendiente
+          </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            navigate(
-              `/pago/reintentar/${pedido.id}`
-            )
-          }
-          className="
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                `/pago/reintentar/${pedido.id}`
+              )
+            }
+            className="
             bg-red-600
             hover:bg-red-500
             text-white
@@ -168,75 +171,75 @@ export default function MisComprasPage() {
             transition-colors
             cursor-pointer
           "
-        >
-          Reintentar pago
-        </button>
+          >
+            Reintentar pago
+          </button>
 
-      </div>
-    );
-  }
-
-  if (
-    item.estado_material ===
-    'MATERIAL_PENDIENTE'
-  ) {
-    return (
-      <div>
-        <div className="flex items-center gap-2 text-slate-300 text-sm font-bold">
-          <Clock3 size={17} />
-          Material pendiente
         </div>
+      );
+    }
 
-        <p className="text-xs text-slate-500 mt-2">
-          Estamos preparando tu material. Cuando esté disponible podrás seleccionarlo desde aquí.
-        </p>
-      </div>
-    );
-  }
+    if (
+      item.estado_material ===
+      'MATERIAL_PENDIENTE'
+    ) {
+      return (
+        <div>
+          <div className="flex items-center gap-2 text-slate-300 text-sm font-bold">
+            <Clock3 size={17} />
+            Material pendiente
+          </div>
 
-  if (
-    item.estado_material ===
-    'DISPONIBLE_PARA_SELECCIONAR'
-  ) {
+          <p className="text-xs text-slate-500 mt-2">
+            Estamos preparando tu material. Cuando esté disponible podrás seleccionarlo desde aquí.
+          </p>
+        </div>
+      );
+    }
+
+    if (
+      item.estado_material ===
+      'DISPONIBLE_PARA_SELECCIONAR'
+    ) {
+      return (
+        <div>
+          <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold">
+            <CheckCircle2 size={17} />
+            Material disponible
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              handleSeleccionarMaterial(item)
+            }
+            className="mt-3 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+          >
+            Seleccionar material
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div>
         <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold">
           <CheckCircle2 size={17} />
-          Material disponible
+          Material seleccionado
         </div>
 
         <button
           type="button"
           onClick={() =>
-            handleSeleccionarMaterial(item)
+            handleVerArchivos(item)
           }
-          className="mt-3 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+          className="mt-3 bg-[#1A1F2E] border border-slate-700 hover:border-slate-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
         >
-          Seleccionar material
+          Ver mis archivos
         </button>
       </div>
     );
-  }
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold">
-        <CheckCircle2 size={17} />
-        Material seleccionado
-      </div>
-
-      <button
-        type="button"
-        onClick={() =>
-          handleVerArchivos(item)
-        }
-        className="mt-3 bg-[#1A1F2E] border border-slate-700 hover:border-slate-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
-      >
-        Ver mis archivos
-      </button>
-    </div>
-  );
-};
+  };
 
   if (loading) {
     return (

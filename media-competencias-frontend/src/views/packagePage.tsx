@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Camera, Video, ShoppingCart, Sparkles, Plus } from "lucide-react";
+import { ArrowLeft, Camera, Video, ShoppingCart, Sparkles, Plus, ImageIcon } from "lucide-react";
 import { useCart } from "../context/cartContext"; // <-- Asumiendo que esta es tu ruta
 import AuthModal from "../components/authModal";
 import { API_BASE } from '../config/api';
@@ -372,14 +372,17 @@ export default function PackagesPage() {
             state: {
               paquete: {
                 ...activePackage,
+
                 descripcion:
                   activePackage.descripcion || '',
+
                 precio:
                   Number(activePackage.precio),
+
                 cantidad_fotos:
-                  Number(
-                    activePackage.cantidad_fotos
-                  )
+                  activePackage.cantidad_fotos == null
+                    ? null
+                    : Number(activePackage.cantidad_fotos)
               },
 
               participante: {
@@ -392,10 +395,8 @@ export default function PackagesPage() {
             }
           }
         );
-
         return;
       }
-
 
       /*
        * RESERVA
@@ -520,12 +521,10 @@ export default function PackagesPage() {
       {/* CONTENIDO PRINCIPAL */}
       <div className="px-6 py-8">
         <div className="max-w-5xl mx-auto">
-
           {/* CABECERA DEL PARTICIPANTE */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 p-6 bg-[#12131A] border border-slate-800 rounded-2xl">
             <div className="flex items-center gap-5">
-              <div
-                className={`w-16 h-16 rounded-2xl ${avatarColor} flex items-center justify-center text-white text-xl font-black shrink-0 shadow-lg`}
+              <div className={`w-16 h-16 rounded-2xl ${avatarColor} flex items-center justify-center text-white text-xl font-black shrink-0 shadow-lg`}
                 style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
               >
                 {initials(participante.nombre_completo)}
@@ -537,16 +536,15 @@ export default function PackagesPage() {
                   </span>
                   {renderTipoBadge(participante.tipo_categoria)}
                 </div>
-                <h1
-                  className="text-3xl md:text-4xl font-black uppercase leading-tight text-white"
-                  style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
-                >
+                <h1 className="text-3xl md:text-4xl font-black uppercase leading-tight text-white" style={{ fontFamily: '"Barlow Condensed", sans-serif' }}>
                   {participante.nombre_completo}
                 </h1>
-                <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                <div className="flex items-center gap-3 mt-1 text-xs text-slate-400 flex-wrap">
                   <span>{participante.nombre_categoria}</span>
                   <span className="text-slate-600">•</span>
-                  <span className="font-mono text-red-500 font-bold">Dorsal #{participante.dorsal_numero || "S/N"}</span>
+                  <span className="font-mono text-red-500 font-bold">
+                    Orden #{participante.dorsal_numero || 'S/N'}
+                  </span>
                   {participante.academia && (
                     <>
                       <span className="text-slate-600">•</span>
@@ -556,6 +554,17 @@ export default function PackagesPage() {
                 </div>
               </div>
             </div>
+            {/* BOTÓN VER FOTOS */}
+            <button type="button"
+              onClick={() =>
+                navigate(
+                  `/eventos/${evento.id}/participantes/${participante.id}/galeria`
+                )
+              }
+              className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 text-white border border-slate-700 hover:border-red-500 hover:bg-[#1D202A] text-white font-bold text-sm transition-all cursor-pointer shrink-0"
+            >
+              <ImageIcon size={18} />Ver mis fotos
+            </button>
           </div>
 
           <div className="mb-6">
@@ -660,11 +669,10 @@ export default function PackagesPage() {
                               setSelectedType('foto');
                               setSelectedFotoPackageId(pkg.id);
                             }}
-                            className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${
-                              selectedFotoPackageId === pkg.id
-                                ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20"
-                                : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
-                            }`}
+                            className={`flex-1 py-1.5 rounded-lg text-base font-black border transition-all cursor-pointer ${selectedFotoPackageId === pkg.id
+                              ? "bg-red-600 border-red-600 text-white shadow-md shadow-red-600/20"
+                              : "bg-[#181a24] border-[#262938] text-slate-300 hover:border-slate-500"
+                              }`}
                             style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
                           >
                             {pkg.cantidad_fotos == null

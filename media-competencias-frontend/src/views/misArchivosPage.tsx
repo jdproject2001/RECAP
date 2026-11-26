@@ -25,7 +25,7 @@ interface Paquete {
   id: string;
   nombre_paquete: string;
   tipo: 'foto' | 'video' | 'combo';
-  cantidad_fotos: number;
+  cantidad_fotos: number | null;
 }
 
 interface ArchivosResponse {
@@ -39,12 +39,11 @@ interface ArchivosResponse {
 export default function MisArchivosPage() {
   const navigate = useNavigate();
   const { pedidoItemId } = useParams<{ pedidoItemId: string }>();
-
   const [data, setData] = useState<ArchivosResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descargandoId, setDescargandoId] = useState<string | null>(null);
-
+  const [descargandoTodas, setDescargandoTodas] = useState(false);
   // =====================================================
   // CARGAR ARCHIVOS COMPRADOS (Escuchando auth)
   // =====================================================
@@ -118,9 +117,197 @@ export default function MisArchivosPage() {
     [data]
   );
 
+  const fotosIlimitadas = data?.paquete.cantidad_fotos == null;
+  const puedeDescargarTodas = fotosIlimitadas && fotos.length > 0;
+
+  const cantidadFotosRequeridas =
+    data?.paquete.cantidad_fotos == null
+      ? null
+      : Number(data.paquete.cantidad_fotos);
+
+  const puedeAgregarMaterial = useMemo(() => {
+    if (!data) return false;
+
+    // =========================================
+    // SOLO FOTO
+    // =========================================
+
+    if (data.paquete.tipo === 'foto') {
+
+      // Ilimitadas:
+      // siempre permitimos volver a seleccionar
+      if (fotosIlimitadas) {
+        return true;
+      }
+
+      return (
+        fotos.length <
+        Number(cantidadFotosRequeridas)
+      );
+    }
+
+    // =========================================
+    // SOLO VIDEO
+    // =========================================
+
+    if (data.paquete.tipo === 'video') {
+      return videos.length < 1;
+    }
+
+    // =========================================
+    // COMBO
+    // =========================================
+
+    if (data.paquete.tipo === 'combo') {
+
+      // Ilimitado:
+      // puede seguir agregando fotos
+      if (fotosIlimitadas) {
+        return true;
+      }
+
+      return (
+        fotos.length <
+        Number(cantidadFotosRequeridas) ||
+        videos.length < 1
+      );
+    }
+
+    return false;
+
+  }, [
+    data,
+    fotos.length,
+    videos.length,
+    fotosIlimitadas,
+    cantidadFotosRequeridas
+  ]);
+
   // =====================================================
   // DESCARGAR ORIGINAL
   // =====================================================
+  const handleAgregarMaterial = () => {
+    if (!data || !pedidoItemId) {
+      return;
+    }
+
+    navigate(
+      `/mis-compras/${pedidoItemId}/seleccionar-material`,
+      {
+        state: {
+          pedidoItemId,
+
+          paquete: {
+            id: data.paquete.id,
+            nombre_paquete:
+              data.paquete.nombre_paquete,
+
+            descripcion: '',
+
+            // No se va a volver a cobrar.
+            precio: 0,
+
+            tipo:
+              data.paquete.tipo,
+
+            cantidad_fotos:
+              data.paquete.cantidad_fotos
+          },
+
+          participante: {
+            id:
+              data.participante.id,
+
+            nombre_completo:
+              data.participante.nombre_completo,
+
+            dorsal_numero:
+              data.participante.dorsal_numero
+          },
+
+          // Material que ya compró
+          multimediaExistenteIds:
+            data.archivos.map(
+              archivo => archivo.id
+            ),
+
+          fotosYaSeleccionadas:
+            fotos.length,
+
+          videosYaSeleccionados:
+            videos.length,
+
+          modo: 'AGREGAR'
+        }
+      }
+    );
+  };
+
+  const handleDescargarTodas = async () => {
+    try {
+      if (!pedidoItemId || !data) {
+        return;
+      }
+      setDescargandoTodas(true);
+      setError(null);
+      const user = auth.currentUser;
+
+      if (!user) {
+        throw new Error(
+          'Debes iniciar sesión para descargar las fotografías.'
+        );
+      }
+
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `${API_BASE}/pedidos/${pedidoItemId}/fotos/zip`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        let mensaje =
+          'No se pudieron descargar las fotografías.'
+        try {
+          const responseData =
+            await response.json();
+          mensaje =
+            responseData.error ||
+            mensaje;
+        } catch {
+          // Si la respuesta no viene como JSON
+        }
+        throw new Error(mensaje);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download =
+        `RECAP-#-${data.participante.dorsal_numero || 'fotos'}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(
+        'Error descargando todas las fotos:',
+        err
+      );
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron descargar las fotografías.'
+      );
+    } finally {
+      setDescargandoTodas(false);
+    }
+  };
 
   const handleDescargar = async (archivo: Archivo) => {
     try {
@@ -221,9 +408,9 @@ export default function MisArchivosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0D111C] text-white pt-24 pb-16">
+    <div className="min-h-screen bg-[#0D111C] text-white pt-6 pb-16">
       <div className="max-w-6xl mx-auto px-6">
-        
+
         {/* VOLVER */}
         <button
           type="button"
@@ -235,35 +422,68 @@ export default function MisArchivosPage() {
         </button>
 
         {/* CABECERA */}
-        <div className="bg-[#12131A] border border-slate-800 rounded-2xl p-6 mb-8">
-          <p className="text-red-500 text-xs font-bold uppercase tracking-[0.2em] mb-2">
-            Tus archivos
-          </p>
+        <div className="bg-[#12131A] border border-slate-800 rounded-2xl p-6 mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <p className="text-red-500 text-xs font-bold uppercase tracking-[0.2em] mb-2">
+              Tus archivos
+            </p>
 
-          <h1
-            className="text-3xl md:text-4xl font-black uppercase tracking-wide"
-            style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
-          >
-            {data.participante.nombre_completo}
-          </h1>
+            <h1
+              className="text-3xl md:text-4xl font-black uppercase tracking-wide"
+              style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
+            >
+              {data.participante.nombre_completo}
+            </h1>
 
-          <p className="text-slate-400 mt-1">
-            Dorsal #{data.participante.dorsal_numero}
-          </p>
+            <p className="text-slate-400 mt-1">
+              Dorsal #{data.participante.dorsal_numero}
+            </p>
 
-          <div className="flex flex-wrap gap-3 mt-5">
-            <span className="bg-[#181A24] border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold">
-              {data.paquete.nombre_paquete}
-            </span>
+            <div className="flex flex-wrap gap-3 mt-5">
+              <span className="bg-[#181A24] border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold">
+                {data.paquete.nombre_paquete}
+              </span>
 
-            <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg px-3 py-1.5 text-xs font-bold">
-              Compra completada
-            </span>
+              <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg px-3 py-1.5 text-xs font-bold">
+                Compra completada
+              </span>
 
-            <span className="bg-[#181A24] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300">
-              {data.total_archivos}{' '}
-              {data.total_archivos === 1 ? 'archivo' : 'archivos'}
-            </span>
+              <span className="bg-[#181A24] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+                {data.total_archivos}{' '}
+                {data.total_archivos === 1 ? 'archivo' : 'archivos'}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 lg:items-end shrink-0" >
+            {puedeAgregarMaterial && (
+              <button
+                type="button"
+                onClick={handleAgregarMaterial}
+                className="
+                mt-5
+                inline-flex
+                items-center
+                justify-center
+                gap-2
+                bg-red-600
+                hover:bg-red-500
+                text-white
+                font-bold
+                px-5
+                py-3
+                rounded-xl
+                transition-colors
+                cursor-pointer
+              "
+              >
+                <ImageIcon size={18} />
+                {data.paquete.tipo === 'combo' && videos.length < 1
+                  ? 'Seleccionar material faltante'
+                  : fotosIlimitadas
+                    ? 'Agregar más fotos'
+                    : 'Seleccionar material faltante'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -277,15 +497,48 @@ export default function MisArchivosPage() {
         {/* SECCIÓN: FOTOGRAFÍAS */}
         {fotos.length > 0 && (
           <section className="mb-12">
-            <div className="flex items-center gap-2 mb-5">
-              <ImageIcon size={20} className="text-red-500" />
-              <h2
-                className="text-xl font-black uppercase"
-                style={{ fontFamily: '"Barlow Condensed", sans-serif' }}
-              >
-                Fotografías
-              </h2>
-              <span className="text-sm text-slate-500">({fotos.length})</span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+              <div className="flex items-center gap-2">
+                <ImageIcon
+                  size={20}
+                  className="text-red-500"
+                />
+                <h2
+                  className="text-xl font-black uppercase"
+                  style={{
+                    fontFamily: '"Barlow Condensed", sans-serif'
+                  }}
+                >
+                  Fotografías
+                </h2>
+                <span className="text-sm text-slate-500">
+                  ({fotos.length})
+                </span>
+              </div>
+
+              {puedeDescargarTodas && (
+                <button
+                  type="button"
+                  onClick={handleDescargarTodas}
+                  disabled={descargandoTodas}
+                  className="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                >
+                  {descargandoTodas ? (
+                    <>
+                      <Loader2
+                        size={17}
+                        className="animate-spin"
+                      />
+                      Preparando ZIP...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={17} />
+                      Descargar todas
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">

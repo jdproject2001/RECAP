@@ -1,6 +1,6 @@
 //orderRoutes.ts
 import { Router } from 'express';
-import { createOrder, getMyPurchases, getOrderItemFiles, selectMaterialForOrderItem } from '../controllers/orderController';
+import { createOrder, downloadOrderItemPhotosZip, getMyPurchases, getOrderItemFiles, selectMaterialForOrderItem } from '../controllers/orderController';
 import { authenticateFirebase } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -11,5 +11,7 @@ router.get('/mis-compras', authenticateFirebase, getMyPurchases);
 router.post('/:pedidoItemId/seleccionar-material', authenticateFirebase, selectMaterialForOrderItem);
 
 router.get('/:pedidoItemId/archivos', authenticateFirebase, getOrderItemFiles);
+
+router.get('/:pedidoItemId/fotos/zip', authenticateFirebase, downloadOrderItemPhotosZip);
 
 export default router;

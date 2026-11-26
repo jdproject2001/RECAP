@@ -16,6 +16,7 @@ import MisComprasPage from './views/misComprasPage';
 import MisArchivosPage from './views/misArchivosPage';
 import RetryPaymentPage from './views/RetryPaymentPage';
 import AdminEventDashboardPage from './views/adminEventDashboardPage';
+import ParticipantGalleryPage from './views/participantGalleryPage';
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -35,6 +36,8 @@ function AppRoutes() {
 
           {/* 3. Ruta para ver los paquetes del participante */}
           <Route path="/:eventSlug/participante/:participantId" element={<PackagesPage />} />
+
+          <Route path="/eventos/:eventSlug/participantes/:participantId/galeria" element={<ParticipantGalleryPage />}/>
 
           {/* 4. RUTA ADMIN: Formulario para ingresar participantes */}
           <Route path="/evento/:eventId/admin/participantes" element={<AdminAddParticipantPage />} />

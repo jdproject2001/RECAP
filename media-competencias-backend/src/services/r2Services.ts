@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { R2_BUCKET_NAME } from '../config/r2';
+import { Readable } from 'stream';
 
 const accountId = process.env.R2_ACCOUNT_ID;
 const accessKeyId = process.env.R2_ACCESS_KEY_ID;
@@ -64,7 +65,7 @@ export const generateDownloadUrl = async (
 ): Promise<string> => {
 
   const safeFileName = fileName?.replace(/["\r\n]/g, '_');
-  const encodedFileName = safeFileName? encodeURIComponent(safeFileName): null;
+  const encodedFileName = safeFileName ? encodeURIComponent(safeFileName) : null;
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: key,
@@ -123,6 +124,30 @@ export const downloadFromR2 = async (
     bytes.byteOffset,
     bytes.byteLength
   );
+};
+
+/* =====================================================
+   Descargar archivo desde R2 como STREAM
+   ===================================================== */
+export const getObjectStreamFromR2 = async (
+  key: string
+): Promise<Readable> => {
+
+  const result = await r2Client.send(
+    new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key
+    })
+  );
+
+  if (!result.Body) {
+    throw new Error(
+      'R2 no devolvió contenido para el archivo.'
+    );
+  }
+
+  // En Node.js, Body del SDK de AWS es un Readable stream.
+  return result.Body as Readable;
 };
 
 // =====================================================

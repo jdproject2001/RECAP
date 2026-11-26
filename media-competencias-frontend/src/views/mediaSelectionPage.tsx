@@ -12,7 +12,7 @@ interface PaqueteSeleccionado {
   descripcion: string;
   precio: number;
   tipo: 'foto' | 'video' | 'combo';
-  cantidad_fotos: number;
+  cantidad_fotos: number | null;
 }
 
 interface ParticipanteSeleccionado {
@@ -37,7 +37,14 @@ interface LocationState {
   paquete?: PaqueteSeleccionado;
   participante?: ParticipanteSeleccionado;
   pedidoItemId?: string;
-  modo?: 'DIRECTA' | 'RESERVA';
+  modo?:
+  | 'DIRECTA'
+  | 'RESERVA'
+  | 'AGREGAR';
+
+  multimediaExistenteIds?: string[];
+  fotosYaSeleccionadas?: number;
+  videosYaSeleccionados?: number;
 }
 
 export default function MediaSelectionPage() {
@@ -54,6 +61,10 @@ export default function MediaSelectionPage() {
   const participante = state?.participante;
   const modo = state?.modo || 'DIRECTA';
   const esReserva = modo === 'RESERVA';
+  const esAgregar = modo === 'AGREGAR';
+  const multimediaExistenteIds = state?.multimediaExistenteIds || [];
+  const fotosYaSeleccionadas = state?.fotosYaSeleccionadas || 0;
+  const videosYaSeleccionados = state?.videosYaSeleccionados || 0;
   const pedidoItemId = state?.pedidoItemId || pedidoItemIdParam;
   const [multimedia, setMultimedia] = useState<Multimedia[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -117,82 +128,205 @@ export default function MediaSelectionPage() {
     cargarMultimedia();
   }, [participanteIdEfectivo]);
 
-  const fotos = useMemo(() => multimedia.filter(
-    (item) =>
-      item.tipo === 'FOTO' &&
-      item.activo &&
-      !!item.previewUrl
-  ),
-    [multimedia]
+  const fotos = useMemo(
+    () =>
+      multimedia.filter(
+        (item) =>
+          item.tipo === 'FOTO' &&
+          item.activo &&
+          !!item.previewUrl &&
+          !multimediaExistenteIds.includes(
+            item.id
+          )
+      ),
+    [
+      multimedia,
+      multimediaExistenteIds
+    ]
   );
 
-  const videos = useMemo(() => multimedia.filter(
-    (item) =>
-      item.tipo === 'VIDEO' &&
-      item.activo
-  ),
-    [multimedia]
+  const videos = useMemo(
+    () =>
+      multimedia.filter(
+        (item) =>
+          item.tipo === 'VIDEO' &&
+          item.activo &&
+          !multimediaExistenteIds.includes(
+            item.id
+          )
+      ),
+    [
+      multimedia,
+      multimediaExistenteIds
+    ]
   );
 
-  const fotosSeleccionadas = selectedIds.filter((id) =>
-    fotos.some((foto) => foto.id === id)
-  );
+  const fotosSeleccionadas = selectedIds.filter((id) => fotos.some((foto) => foto.id === id));
+  const videosSeleccionados = selectedIds.filter((id) => videos.some((video) => video.id === id));
+  const cantidadFotosRequeridas = paquete?.cantidad_fotos == null
+    ? null
+    : Number(paquete.cantidad_fotos);
 
-  const videosSeleccionados = selectedIds.filter((id) =>
-    videos.some((video) => video.id === id)
-  );
-
-  const cantidadFotosRequeridas =
-    Number(paquete?.cantidad_fotos || 0);
-
+  const fotosIlimitadas = cantidadFotosRequeridas === null;
   const seleccionValida = useMemo(() => {
+
     if (!paquete) return false;
+    const totalFotos = fotosYaSeleccionadas + fotosSeleccionadas.length;
+    const totalVideos = videosYaSeleccionados + videosSeleccionados.length;
+
+    // =====================================
+    // FOTO
+    // =====================================
 
     if (paquete.tipo === 'foto') {
+      if (fotosIlimitadas) {
+        // Al agregar, exigimos al menos
+        // una foto NUEVA
+        if (esAgregar) {
+          return (
+            fotosSeleccionadas.length >= 1 &&
+            totalVideos === 0
+          );
+        }
+
+        return (
+          totalFotos >= 1 &&
+          totalVideos === 0
+        );
+      }
+
       return (
-        fotosSeleccionadas.length === cantidadFotosRequeridas &&
-        videosSeleccionados.length === 0
+        totalFotos ===
+        cantidadFotosRequeridas &&
+        totalVideos === 0
       );
     }
+
+    // =====================================
+    // VIDEO
+    // =====================================
 
     if (paquete.tipo === 'video') {
       return (
-        fotosSeleccionadas.length === 0 &&
-        videosSeleccionados.length === 1
+        totalFotos === 0 &&
+        totalVideos === 1
       );
     }
+
+    // =====================================
+    // COMBO
+    // =====================================
 
     if (paquete.tipo === 'combo') {
+      if (fotosIlimitadas) {
+        if (esAgregar) {
+          // Tiene que agregar al menos algo:
+          // una foto o el video faltante.
+          const agregoAlgo =
+            fotosSeleccionadas.length > 0 ||
+            videosSeleccionados.length > 0;
+
+          return (
+            agregoAlgo &&
+            totalFotos >= 1 &&
+            totalVideos === 1
+          );
+        }
+
+        return (
+          totalFotos >= 1 &&
+          totalVideos === 1
+        );
+      }
+
       return (
-        fotosSeleccionadas.length === cantidadFotosRequeridas &&
-        videosSeleccionados.length === 1
+        totalFotos ===
+        cantidadFotosRequeridas &&
+        totalVideos === 1
       );
     }
-
     return false;
   }, [
     paquete,
     cantidadFotosRequeridas,
+    fotosIlimitadas,
+    esAgregar,
+    fotosYaSeleccionadas,
+    videosYaSeleccionados,
     fotosSeleccionadas.length,
     videosSeleccionados.length
   ]);
+
+  const seleccionarTodasLasFotos = () => {
+    if (!fotosIlimitadas) return;
+
+    const idsFotos = fotos.map(
+      foto => foto.id
+    );
+
+    setSelectedIds(prev => {
+      const idsSinFotos = prev.filter(
+        id =>
+          !fotos.some(
+            foto => foto.id === id
+          )
+      );
+
+      return [
+        ...idsSinFotos,
+        ...idsFotos
+      ];
+    });
+  };
+
+  const todasLasFotosSeleccionadas =
+    fotos.length > 0 &&
+    fotos.every(
+      foto =>
+        selectedIds.includes(foto.id)
+    );
+
+  const toggleTodasLasFotos = () => {
+    if (todasLasFotosSeleccionadas) {
+
+      setSelectedIds(prev =>
+        prev.filter(
+          id =>
+            !fotos.some(
+              foto => foto.id === id
+            )
+        )
+      );
+
+      return;
+    }
+
+    seleccionarTodasLasFotos();
+  };
 
   const toggleFoto = (id: string) => {
     if (!paquete) return;
 
     setSelectedIds((prev) => {
-      const alreadySelected = prev.includes(id);
+      const alreadySelected =
+        prev.includes(id);
 
       if (alreadySelected) {
         return prev.filter(
-          (selectedId) => selectedId !== id
+          selectedId =>
+            selectedId !== id
         );
       }
 
       if (
-        fotosSeleccionadas.length >= cantidadFotosRequeridas
+        cantidadFotosRequeridas !== null
       ) {
-        return prev;
+        const totalFotosDespues = fotosYaSeleccionadas + fotosSeleccionadas.length + 1;
+        if (
+          totalFotosDespues > cantidadFotosRequeridas
+        ) {
+          return prev;
+        }
       }
 
       return [...prev, id];
@@ -200,19 +334,27 @@ export default function MediaSelectionPage() {
   };
 
   const toggleVideo = (id: string) => {
+    // Ya tiene el video comprado
+    if (videosYaSeleccionados >= 1) {
+      return;
+    }
     setSelectedIds((prev) => {
-      const idsSinVideos = prev.filter(
-        (selectedId) =>
-          !videos.some(
-            (video) => video.id === selectedId
-          )
-      );
+      const idsSinVideos =
+        prev.filter(
+          selectedId =>
+            !videos.some(
+              video =>
+                video.id === selectedId
+            )
+        );
 
       if (prev.includes(id)) {
         return idsSinVideos;
       }
-
-      return [...idsSinVideos, id];
+      return [
+        ...idsSinVideos,
+        id
+      ];
     });
   };
 
@@ -230,7 +372,7 @@ export default function MediaSelectionPage() {
     // =====================================================
     // COMPRA DIRECTA
     // =====================================================
-    if (!esReserva) {
+    if (!esReserva && !esAgregar) {
       addToCart(
         {
           id: paquete.id,
@@ -381,11 +523,23 @@ export default function MediaSelectionPage() {
         <div className="bg-[#12131A] border border-slate-800 rounded-2xl p-5 mb-8">
           {paquete.tipo === 'foto' && (
             <p className="text-sm text-slate-300">
-              Selecciona exactamente{' '}
-              <strong className="text-white">
-                {cantidadFotosRequeridas} fotos
-              </strong>
-              .
+              {fotosIlimitadas ? (
+                <>
+                  Selecciona las{' '}
+                  <strong className="text-white">
+                    fotos que quieras
+                  </strong>
+                  .
+                </>
+              ) : (
+                <>
+                  Selecciona exactamente{' '}
+                  <strong className="text-white">
+                    {cantidadFotosRequeridas} fotos
+                  </strong>
+                  .
+                </>
+              )}
             </p>
           )}
 
@@ -401,15 +555,31 @@ export default function MediaSelectionPage() {
 
           {paquete.tipo === 'combo' && (
             <p className="text-sm text-slate-300">
-              Selecciona exactamente{' '}
-              <strong className="text-white">
-                {cantidadFotosRequeridas} fotos
-              </strong>{' '}
-              y{' '}
-              <strong className="text-white">
-                1 video
-              </strong>
-              .
+              {fotosIlimitadas ? (
+                <>
+                  Selecciona las{' '}
+                  <strong className="text-white">
+                    fotos que quieras
+                  </strong>{' '}
+                  y{' '}
+                  <strong className="text-white">
+                    1 video
+                  </strong>
+                  .
+                </>
+              ) : (
+                <>
+                  Selecciona exactamente{' '}
+                  <strong className="text-white">
+                    {cantidadFotosRequeridas} fotos
+                  </strong>{' '}
+                  y{' '}
+                  <strong className="text-white">
+                    1 video
+                  </strong>
+                  .
+                </>
+              )}
             </p>
           )}
         </div>
@@ -445,7 +615,29 @@ export default function MediaSelectionPage() {
                         Fotografías
                       </h2>
                     </div>
-
+                    {fotosIlimitadas && fotos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={toggleTodasLasFotos}
+                        className="
+                          mb-1
+                          px-4
+                          py-3
+                          bg-[#181A24]
+                          border
+                          border-slate-700
+                          hover:border-red-500
+                          rounded-xl
+                          font-bold
+                          text-sm
+                          cursor-pointer
+                        "
+                      >
+                        {todasLasFotosSeleccionadas
+                          ? 'Quitar selección de todas'
+                          : `Seleccionar todas (${fotos.length})`}
+                      </button>
+                    )}
                     <span className="text-sm text-slate-400">
                       {fotosSeleccionadas.length}/
                       {cantidadFotosRequeridas}
@@ -584,7 +776,12 @@ export default function MediaSelectionPage() {
 
               <p className="text-sm text-white">
                 {paquete.tipo !== 'video' &&
-                  `${fotosSeleccionadas.length}/${cantidadFotosRequeridas} fotos`}
+                  (
+                    fotosIlimitadas
+                      ? `${fotosSeleccionadas.length} fotos seleccionadas`
+                      : `${fotosSeleccionadas.length}/${cantidadFotosRequeridas} fotos`
+                  )
+                }
 
                 {paquete.tipo === 'combo' && ' + '}
 
@@ -609,8 +806,8 @@ export default function MediaSelectionPage() {
                 disabled={!seleccionValida || confirmando}
                 onClick={handleConfirmarSeleccion}
                 className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold uppercase transition-all ${seleccionValida && !confirmando
-                    ? 'bg-red-600 hover:bg-red-500 text-white cursor-pointer'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  ? 'bg-red-600 hover:bg-red-500 text-white cursor-pointer'
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}
               >
                 {confirmando ? (
